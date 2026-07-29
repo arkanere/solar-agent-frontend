@@ -4,6 +4,9 @@
 // the Vite proxy in vite.config.ts forwards the relative path to localhost:8000,
 // which keeps dev same-origin and out of CORS entirely — the deployed backend's
 // allow-list does not include localhost, so there is no local-to-cloud path.
-const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+// `import.meta.env` is injected by Vite, so it is absent when this module is
+// imported outside a Vite bundle — plain Node, for one. Optional-chaining it
+// keeps the module usable there instead of throwing at import time.
+const BASE = import.meta.env?.VITE_API_BASE_URL ?? '';
 
 export const apiUrl = (path: string) => `${BASE}${path}`;

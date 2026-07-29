@@ -23,7 +23,7 @@ can resume from the checklist without re-reading the Svelte codebase.
 ## Progress
 
 - [x] **Phase 0** — Scaffold: Vite + React + TS + Tailwind v4 + shadcn/ui
-- [ ] **Phase 1** — Types and the NDJSON stream client (pure TS, no React)
+- [x] **Phase 1** — Types and the NDJSON stream client (pure TS, no React)
 - [ ] **Phase 2** — Zustand store: messages, lead profile, persistence
 - [ ] **Phase 3** — Static chat UI: list, bubble, composer
 - [ ] **Phase 4** — Wire streaming: send, stop, retry, regenerate
@@ -60,7 +60,7 @@ Settled at planning time. Revisit only with a note in the Session log explaining
 **Goal:** an empty React app that builds, lints, and renders the design tokens correctly
 in light and dark mode.
 
-- [x] `npm create vite@latest . -- --template react-ts` in `~/Developer/solar-agent-frontend`
+- [x] `npm create vite@latest . -- --template react-ts` in the repo root
 - [x] ~~`git init`~~ — not needed, the directory was already a git repo on `main`
 - [x] Install Tailwind v4: `tailwindcss @tailwindcss/vite`, wire the Vite plugin
 - [x] Copy `src/app.css` from the Svelte app → `src/index.css`. It is plain CSS
@@ -101,22 +101,36 @@ background `rgb(250, 248, 245)` and default `<Button>` background `rgb(255, 102,
 typed events. No React in this phase — this is the highest-risk logic and it should be
 independently testable.
 
-- [ ] `src/lib/types.ts` — `ChatMessage`, `LeadProfile`, `StreamEvent` (see §C)
-- [ ] Model `StreamEvent` as a **discriminated union on `type`**
-- [ ] `src/lib/stream.ts` — `parseNdjsonStream(response): AsyncGenerator<StreamEvent>`
-  - [ ] Buffer across chunk boundaries: chunk edges do not align with newlines.
+- [x] `src/lib/types.ts` — `ChatMessage`, `LeadProfile`, `StreamEvent` (see §C).
+      *Also `EMPTY_LEAD_PROFILE`, `Source`, `HistoryTurn`, `RawStreamEvent`.*
+- [x] Model `StreamEvent` as a **discriminated union on `type`**
+- [x] `src/lib/stream.ts` — `parseNdjsonStream(response): AsyncGenerator<StreamEvent>`
+  - [x] Buffer across chunk boundaries: chunk edges do not align with newlines.
         Split on `\n`, keep the trailing partial line in the buffer.
-  - [ ] A malformed line must be skipped with a warning, not thrown — one bad line
+  - [x] A malformed line must be skipped with a warning, not thrown — one bad line
         must not kill an otherwise healthy stream
-  - [ ] Unknown `type` values pass through and are ignored downstream, so the backend
-        can add events without breaking this client
-- [ ] `src/lib/chatClient.ts` — `sendChatMessage({ userMessage, history, leadProfile, signal })`
+  - [x] Unknown `type` values pass through and are ignored downstream, so the backend
+        can add events without breaking this client. *Wrapped as
+        `{ type: 'unrecognised', raw }` — see Session log for why a bare catch-all
+        could not be used.*
+- [x] `src/lib/chatClient.ts` — `sendChatMessage({ userMessage, history, leadProfile, signal })`
       returning the event stream. Throws on non-OK or missing `response.body`.
-- [ ] Constant: history is capped at the **last 8 turns**, `{ role, content }` only
+- [x] Constant: history is capped at the **last 8 turns**, `{ role, content }` only.
+      *`HISTORY_LIMIT` in `chatClient.ts`, applied in `sendChatMessage` so no caller
+      can forget it. `toHistory()` reduces a transcript and drops failed turns.*
 
 **Done when:** a scratch script feeds a hand-written multi-chunk NDJSON string
 (deliberately splitting one JSON object across two chunks) through the parser and gets
 the correct events out in order.
+
+**Verified 2026-07-29.** Two scratch scripts, 27 assertions, all passing. Parser: object
+split mid-token across chunks; splits one byte either side of a `\n`; byte-at-a-time
+chunking; malformed line skipped; unknown type passed through; missing trailing newline;
+blank lines; nothing delivered after `done`; a 3-byte `₹` split across chunks; empty
+stream. Client: request shape, history capped to the *last* 8 in order, full profile
+sent, non-OK throws. Narrowing was checked with `tsc` separately (a control case
+confirms `ev` narrows to exactly `{ type: "delta"; text: string }`) — `tsx` strips types
+without checking them, so the runtime pass alone proved nothing.
 
 ---
 
@@ -295,7 +309,12 @@ it, and the transcript survives closing and reopening.
 
 - [ ] Install `vitest @testing-library/react @testing-library/user-event jsdom`
 - [ ] `stream.test.ts` — chunk boundaries mid-object, malformed lines, unknown event
-      types, missing trailing newline
+      types, missing trailing newline. Phase 1's scratch scripts already cover these
+      plus: splits one byte either side of a `\n`, byte-at-a-time chunking, blank and
+      whitespace-only lines, nothing delivered after `done`, a multi-byte character
+      (`₹`) split across chunks, and an empty stream. **Port all of them.**
+- [ ] `chatClient.test.ts` — request shape, history capped to the *last* 8 turns in
+      order, failed turns excluded by `toHistory`, non-OK response throws
 - [ ] `chatStore.test.ts` — `applyContextUpdates` mapping including the `hasDocuments:
       false` case, patch/truncate actions, persistence round-trip
 - [ ] `useChat.test.ts` — mocked `ReadableStream`: happy path, pre-delta event buffering,
@@ -327,7 +346,7 @@ it, and the transcript survives closing and reopening.
 
 | What | Path |
 | --- | --- |
-| React app (this repo) | `~/Developer/solar-agent-frontend` |
+| React app (this repo) | `.` |
 | Svelte original | `~/Developer/svelte/solar-app/apps/main-app` |
 | Backend | `~/Developer/solar-agent-backend` |
 | Backend integration doc | `solar-agent-backend/FRONTEND_INTEGRATION.md` |
@@ -536,4 +555,7 @@ happen.
 | 2026-07-29 | — | Plan written. Svelte source and backend contract surveyed; all decisions in the table above locked. No code written yet. |
 | 2026-07-29 | 0 | Scaffold done and verified. Deviations from the plan, all agreed at the time: (1) **oxlint, not ESLint** — `create-vite` v9 ships oxlint by default and the scaffold arrives pre-wired with the react-hooks rules; adding ESLint meant removing that and taking on ~8 devDeps plus a flat config for no gain here. (2) **`"strict": true` added explicitly** to `tsconfig.app.json` — the v9 scaffold no longer sets it and I could not confirm TS 6 makes it the default; `LeadProfile` is all-nullable, so this matters. (3) `git init` skipped, repo already existed. |
 | 2026-07-29 | 0 | Three scaffold traps worth remembering. (a) `shadcn init` **rewrote the brand palette in place** — it replaced every HSL token with its own neutral oklch values while leaving the original comments, so `--primary` read `oklch(0.205 0 0) /* #FF6600 */`. Restored `index.css` from the Svelte original and re-added only the two imports shadcn actually needs (`tw-animate-css`, `shadcn/tailwind.css`); its `@layer base` reset and `@theme inline` block were both dropped, the first because the ported CSS already does all of it, the second because it maps `--color-*` to the bare token and would break the `hsl()` wrapper the HSL triplets require. **Re-run `shadcn add` with care — check `git diff src/index.css` afterwards.** (b) The CLI reads the **root `tsconfig.json`**, which in the v9 scaffold is solution-style with no `compilerOptions`; without `paths` duplicated there it silently writes components into a literal `@/` directory. (c) A stale lockfile left `tslib` (a `recast` dep) uninstalled and every `shadcn add` crashed — `rm -rf node_modules package-lock.json && npm install` fixed it. |
+| 2026-07-29 | 1 | Types and stream client done, verified by scratch script. One design decision needed your call: **unknown event types**. The plan says they "pass through and are ignored downstream", but a bare `{ type: string }` catch-all in the union destroys narrowing on every other member — verified with tsc, `case 'delta'` stops seeing `.text`. Chosen fix: unknown events are yielded as `{ type: 'unrecognised', raw }`, a member with its own literal discriminant. Events genuinely pass through, narrowing stays exact, and Phase 4 ignores them in a `default` branch. `isKnownEventType` in `types.ts` is the routing set — **add new event types there as well as to the union**, or they arrive wrapped as unrecognised. |
+| 2026-07-29 | 1 | Two deliberate departures from the Svelte original, both agreed. (1) **The trailing partial line is flushed** at stream end, so a final event with no trailing `\n` is not lost; the Svelte version discards the leftover buffer. (2) The generator **returns after yielding `done`** and cancels the reader in a `finally`, so an early `break` by the consumer releases the connection rather than leaving it open. Also added `decoder.decode()` with no argument at the end to flush a half-decoded multi-byte character — there is a test for `₹` split across a chunk boundary. |
+| 2026-07-29 | 1 | `api.ts` now reads `import.meta.env?.VITE_API_BASE_URL` (optional chaining). Vite injects `import.meta.env`, so the module threw at import time under plain Node, which blocked scratch verification. Vitest does provide it, so this is not needed for Phase 9 — it just keeps the module importable outside a bundle. |
 | 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |
