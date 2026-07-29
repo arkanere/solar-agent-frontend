@@ -351,6 +351,13 @@ it, and the transcript survives closing and reopening.
 | Backend | `~/Developer/solar-agent-backend` |
 | Backend integration doc | `solar-agent-backend/FRONTEND_INTEGRATION.md` |
 
+**This repo is public** — <https://github.com/arkanere/solar-agent-frontend>. The paths
+above are deliberately `~`-relative: absolute paths carrying the home directory were
+scrubbed from the whole history before the first push. **Do not paste absolute paths
+back into this file**, here or in the Session log. The Svelte original and the backend
+are not published alongside it, so anything this document needs from them has to be
+quoted here rather than linked.
+
 Svelte files being ported, relative to `apps/main-app/src/lib/`:
 
 | File | Lines | React target |
@@ -558,4 +565,6 @@ happen.
 | 2026-07-29 | 1 | Types and stream client done, verified by scratch script. One design decision needed your call: **unknown event types**. The plan says they "pass through and are ignored downstream", but a bare `{ type: string }` catch-all in the union destroys narrowing on every other member — verified with tsc, `case 'delta'` stops seeing `.text`. Chosen fix: unknown events are yielded as `{ type: 'unrecognised', raw }`, a member with its own literal discriminant. Events genuinely pass through, narrowing stays exact, and Phase 4 ignores them in a `default` branch. `isKnownEventType` in `types.ts` is the routing set — **add new event types there as well as to the union**, or they arrive wrapped as unrecognised. |
 | 2026-07-29 | 1 | Two deliberate departures from the Svelte original, both agreed. (1) **The trailing partial line is flushed** at stream end, so a final event with no trailing `\n` is not lost; the Svelte version discards the leftover buffer. (2) The generator **returns after yielding `done`** and cancels the reader in a `finally`, so an early `break` by the consumer releases the connection rather than leaving it open. Also added `decoder.decode()` with no argument at the end to flush a half-decoded multi-byte character — there is a test for `₹` split across a chunk boundary. |
 | 2026-07-29 | 1 | `api.ts` now reads `import.meta.env?.VITE_API_BASE_URL` (optional chaining). Vite injects `import.meta.env`, so the module threw at import time under plain Node, which blocked scratch verification. Vitest does provide it, so this is not needed for Phase 9 — it just keeps the module importable outside a bundle. |
+| 2026-07-29 | — | **Published to <https://github.com/arkanere/solar-agent-frontend> (public).** `origin` now exists, branch was already `main`, so commit straight to `main` and push as CLAUDE.md says. Before the first push the history was rewritten with `git filter-repo` to strip the home-directory path from all three commits — **every commit SHA changed**, so any other clone of this repo is on orphaned history and must be re-cloned, not pulled. See §A: keep paths `~`-relative from here on. Cloud Run URL and the CORS notes were kept on purpose; they are useful to anyone running this locally and the URL is already public in the deployed frontend. |
+| 2026-07-29 | — | The repo has **no README** — the public landing page is bare. That is not an oversight: the plan schedules it for Phase 10. Worth pulling forward if the repo is going to be shared before then. |
 | 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |
