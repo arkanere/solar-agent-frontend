@@ -1,0 +1,854 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Theming is driven by a `.dark` class on <html>, not by the OS preference, so
+   the app can offer an explicit toggle. Most of the palette switches purely
+   through the CSS custom properties below, but shadcn components ship `dark:`
+   utilities of their own — this rebinds that variant to the same class. */
+@custom-variant dark (&:is(.dark *));
+
+/* ===== THEME CONFIGURATION ===== */
+@theme {
+  /* Base radius for border-radius calculations */
+  --radius: 0.375rem;
+  --radius-xs: 0.125rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) + 2px);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+
+  /* Typography - Inter font stack */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.06), 0 4px 8px rgba(0, 0, 0, 0.03);
+  --shadow-xl: 0 12px 24px rgba(0, 0, 0, 0.08), 0 6px 12px rgba(0, 0, 0, 0.04);
+  --shadow-card: none;
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  /* Animation timing */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-linear: linear;
+
+  /* Transition Durations */
+  --duration-fast: 100ms;
+  --duration-default: 150ms;
+  --duration-slow: 250ms;
+  --duration-slower: 300ms;
+  --duration-slower-extended: 500ms;
+
+  /* Transition shorthands (duration + easing) */
+  --transition-default: var(--duration-default) var(--ease-default);
+  --transition-fast: var(--duration-fast) var(--ease-default);
+  --transition-slow: var(--duration-slow) var(--ease-default);
+
+  /* Z-Index Scale (layering system) */
+  --z-base: 0;
+  --z-dropdown: 50;
+  --z-sticky: 100;
+  --z-fixed: 200;
+  --z-sidebar: 1000;
+  --z-modal-backdrop: 1100;
+  --z-modal: 1100;
+  --z-popover: 1200;
+  --z-tooltip: 1300;
+  --z-toast: 1400;
+
+  /* Shared interactive tokens */
+  --ring-width: 3px;
+  --ring-offset-width: 2px;
+  --disabled-opacity: 0.5;
+  /* Button Component Tokens */
+  --button-gap: 0.5rem;
+  --button-height-default: 2.25rem;
+  --button-height-sm: 2rem;
+  --button-height-lg: 2.5rem;
+  --button-padding-x-default: 1rem;
+  --button-padding-y-default: 0.5rem;
+  --button-padding-x-sm: 0.75rem;
+  --button-padding-y-sm: 0.25rem;
+  --button-padding-x-lg: 1.5rem;
+  /* Input Component Tokens */
+  --input-height: 2.25rem;
+  --input-padding-x: 0.75rem;
+  --input-padding-y-default: 0.25rem;
+  --input-padding-y-file: 0.375rem;
+  /* Checkbox Component Tokens */
+  --checkbox-size: 1rem;
+  --checkbox-radius: 0.25rem;
+  --checkbox-icon-size: 0.875rem;
+  /* Switch Component Tokens */
+  --switch-track-height: 1.15rem;
+  --switch-track-width: 2rem;
+  --switch-thumb-size: 1rem;
+  --switch-thumb-offset: calc(100% - 2px);
+  /* Select Component Tokens */
+  --select-trigger-height-default: 2.25rem;
+  --select-trigger-height-sm: 2rem;
+  --select-trigger-padding-x: 0.75rem;
+  --select-trigger-padding-y: 0.5rem;
+  --select-trigger-icon-size: 1rem;
+  --select-content-radius: var(--radius-md);
+  --select-item-radius: var(--radius-sm);
+
+  /* Radio Group Component Tokens */
+  --radio-group-gap: 0.75rem;
+  --radio-item-size: 1rem;
+  --radio-item-radius: 100%;
+  --radio-item-shadow: var(--shadow-xs);
+  --radio-indicator-size: 0.5rem;
+
+  /* Textarea Component Tokens */
+  --textarea-min-height: 4rem;
+  --textarea-padding-x: 0.75rem;
+  --textarea-padding-y: 0.5rem;
+  /* Dropdown Menu Component Tokens */
+  --dropdown-menu-content-min-width: 8rem;
+  --dropdown-menu-content-padding: 0.25rem;
+  --dropdown-menu-item-gap: 0.5rem;
+  --dropdown-menu-item-padding-x: 0.5rem;
+  --dropdown-menu-item-padding-y: 0.375rem;
+  --dropdown-menu-item-radius: var(--radius-sm);
+  --dropdown-menu-item-inset-padding: 2rem;
+  --dropdown-menu-label-padding-x: 0.5rem;
+  --dropdown-menu-label-padding-y: 0.375rem;
+  --dropdown-menu-label-inset-padding: 2rem;
+  --dropdown-menu-separator-margin-x: -0.25rem;
+  --dropdown-menu-separator-margin-y: 0.25rem;
+  --dropdown-menu-shortcut-font-size: 0.75rem;
+  --dropdown-menu-shortcut-tracking: var(--tracking-widest);
+  --dropdown-menu-icon-size: 1rem;
+  --dropdown-menu-transition-duration: var(--duration-default);
+
+  /* Card Component Tokens */
+  --card-gap: 1.5rem;
+  --card-padding-y: 1.5rem;
+  --card-radius: var(--radius-xl);
+  --card-shadow: var(--shadow-sm);
+
+  /* Popover Component Tokens */
+  --popover-content-width: 18rem;
+  --popover-content-padding: 1rem;
+  --popover-content-radius: var(--radius-md);
+  --popover-content-shadow: var(--shadow-md);
+  --popover-content-z-index: var(--z-popover);
+  --popover-side-offset: 0.25rem;
+
+  /* Tooltip Component Tokens */
+  --tooltip-content-padding-x: 0.75rem;
+  --tooltip-content-padding-y: 0.375rem;
+  --tooltip-content-radius: var(--radius-md);
+  --tooltip-content-z-index: var(--z-tooltip);
+  --tooltip-content-font-size: 0.75rem;
+  --tooltip-content-bg: hsl(var(--foreground));
+  --tooltip-content-text: hsl(var(--background));
+  --tooltip-arrow-size: 0.625rem;
+  --tooltip-arrow-radius: 2px;
+
+  /* Command Component Tokens */
+  --command-border-gap: 0.5rem;
+  --command-radius: var(--radius-md);
+  --command-input-wrapper-height: 2.25rem;
+  --command-input-wrapper-padding-start: 0.75rem;
+  --command-input-wrapper-padding-end: 2rem;
+  --command-input-height: 2.5rem;
+  --command-input-padding-y: 0.75rem;
+  --command-list-max-height: 300px;
+  --command-list-scroll-padding-y: 0.25rem;
+  --command-item-gap: 0.5rem;
+  --command-item-radius: var(--radius-sm);
+  --command-item-padding-x: 0.5rem;
+  --command-item-padding-y: 0.375rem;
+  --command-group-padding: 0.25rem;
+  --command-group-heading-padding-x: 0.5rem;
+  --command-group-heading-padding-y: 0.375rem;
+  --command-empty-padding-y: 1.5rem;
+  --command-dialog-group-padding-x: 0.5rem;
+  --command-dialog-group-padding-y: 0rem;
+  --command-dialog-input-wrapper-height: 3rem;
+  --command-dialog-input-height: 3rem;
+  --command-dialog-item-padding-x: 0.5rem;
+  --command-dialog-item-padding-y: 0.75rem;
+  --command-dialog-icon-size: 1.25rem;
+
+  /* Badge Component Tokens */
+  --badge-padding-x: 0.5rem;
+  --badge-padding-y: 0.125rem;
+  --badge-gap: 0.25rem;
+  --badge-radius: 9999px;
+  --badge-font-size: 0.75rem;
+  --badge-font-weight: 500;
+  --badge-icon-size: 0.75rem;
+  /* Alert Component Tokens */
+  --alert-radius: var(--radius-lg);
+  --alert-padding-x: 1rem;
+  --alert-padding-y: 0.75rem;
+  --alert-gap-y: 0.125rem;
+  --alert-gap-x: 0.75rem;
+  --alert-icon-size: 1rem;
+  --alert-icon-translate-y: 0.125rem;
+  --alert-shadow: var(--shadow-xs);
+  --alert-description-color: hsl(var(--muted-foreground));
+  --alert-description-font-size: 0.875rem;
+  --alert-description-gap: 0.25rem;
+  --alert-description-line-height: 1.625;
+  --alert-title-font-weight: 500;
+  --alert-title-min-height: 1rem;
+
+  /* Progress Component Tokens */
+  --progress-height: 0.5rem;
+  --progress-radius: 9999px;
+  --progress-bg: hsl(var(--primary) / 0.2);
+  --progress-indicator-bg: hsl(var(--primary));
+  /* Skeleton Component Tokens */
+  --skeleton-radius: var(--radius-md);
+  --skeleton-animation-duration: 2s;
+
+  /* Separator Component Tokens */
+  --separator-thickness: 1px;
+  --separator-color: hsl(var(--border));
+
+  /* Table Component Tokens */
+  --table-font-size: 0.875rem;
+  --table-head-height: 2.5rem;
+  --table-head-padding-x: 0.5rem;
+  --table-cell-padding: 0.5rem;
+  --table-caption-margin-top: 1rem;
+  --table-row-hover-bg: hsl(var(--muted) / 0.5);
+  --table-row-selected-bg: hsl(var(--muted));
+  --table-footer-bg: hsl(var(--muted) / 0.5);
+  --table-row-transition: var(--transition-default);
+
+  /* Tabs Component Tokens */
+  --tabs-root-gap: 0.5rem;
+  --tabs-list-height: 2.25rem;
+  --tabs-list-padding: 0.1875rem;
+  --tabs-list-radius: var(--radius-lg);
+  --tabs-list-bg: hsl(var(--muted));
+  --tabs-list-text-color: hsl(var(--muted-foreground));
+  --tabs-trigger-gap: 0.375rem;
+  --tabs-trigger-padding-x: 0.5rem;
+  --tabs-trigger-padding-y: 0.25rem;
+  --tabs-trigger-radius: var(--radius-md);
+  --tabs-trigger-font-size: 0.875rem;
+  --tabs-trigger-font-weight: 500;
+  --tabs-trigger-height-calc: calc(100% - 1px);
+  --tabs-trigger-shadow: var(--shadow-sm);
+  --tabs-trigger-svg-size: 1rem;
+
+  /* Letter Spacing (Tracking) */
+  --tracking-tighter: -0.05em;
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
+  --tracking-widest: 0.1em;
+
+  /* Letter-spacing for typography hierarchy */
+  --tracking-heading: -0.02em;
+  --tracking-body: 0;
+  --tracking-ui: 0.01em;
+
+  /* Height Scale */
+  --height-xs: 12rem;
+  --height-sm: 16rem;
+  --height-md: 24rem;
+  --height-lg: 32rem;
+  --height-xl: 36rem;
+
+  /* ===== ANIMATIONS ===== */
+  /* Keyframe definitions for animations */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in: fade-in 0.15s ease-out;
+  --animate-fade-out: fade-out 0.15s ease-out;
+  --animate-slide-in-from-top: slide-in-from-top 0.2s ease-out;
+  --animate-slide-in-from-bottom: slide-in-from-bottom 0.2s ease-out;
+
+  /* Spatial animations */
+  --animation-enter-fast: slide-in-from-bottom 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --animation-enter-slow: slide-in-from-bottom 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --animation-scale-in: scale-in 150ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ===== COLOR TOKENS FOR TAILWIND V4 ===== */
+  /* These enable classes like bg-background, text-foreground, etc. */
+
+  /* Background colors */
+  --color-background: hsl(var(--background));
+  --color-background-secondary: hsl(var(--background-secondary));
+  --color-background-tertiary: hsl(var(--background-tertiary));
+
+  /* Foreground/text colors */
+  --color-foreground: hsl(var(--foreground));
+  --color-foreground-secondary: hsl(var(--foreground-secondary));
+
+  /* Border colors */
+  --color-border: hsl(var(--border));
+  --color-border-hover: hsl(var(--border-hover));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* Primary */
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-hover: var(--primary-hover);
+
+  /* Secondary */
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  /* Muted */
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  /* Accent */
+  --color-accent: hsl(var(--accent));
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-muted: hsl(var(--accent-muted));
+
+  /* Secondary (Solar Amber) */
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-muted: hsl(var(--secondary-muted));
+
+  /* Card */
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  /* Popover */
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  /* Destructive */
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-destructive-hover: var(--destructive-hover);
+  --color-destructive-muted: hsl(var(--destructive-muted));
+
+  /* Success */
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-success-muted: hsl(var(--success-muted));
+
+  /* Warning */
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-warning-muted: hsl(var(--warning-muted));
+
+  /* Calendar Component Tokens */
+  --calendar-root-padding: 0.75rem;
+  --calendar-cell-size: 2rem;
+  --calendar-cell-gap: 0.25rem;
+  --calendar-cell-text-size: 0.875rem;
+  --calendar-cell-radius-start: var(--radius-md);
+  --calendar-cell-radius-end: var(--radius-md);
+  --calendar-day-gap: 0.25rem;
+  --calendar-day-text-size: 0.875rem;
+  --calendar-day-inner-text-size: 0.75rem;
+  --calendar-head-cell-text-size: 0.8rem;
+  --calendar-head-cell-radius: var(--radius-md);
+  --calendar-head-cell-font-weight: 400;
+  --calendar-heading-text-size: 0.875rem;
+  --calendar-heading-font-weight: 500;
+  --calendar-grid-margin-top: 1rem;
+  --calendar-grid-gap: 0.25rem;
+  --calendar-nav-gap: 0.25rem;
+  --calendar-nav-button-size: 2rem;
+  --calendar-nav-button-padding: 0;
+  --calendar-nav-icon-size: 1rem;
+
+  /* Slider Component Tokens */
+  --slider-track-height: 0.5rem;
+  --slider-track-radius: var(--radius-md);
+  --slider-track-bg: hsl(var(--input));
+  --slider-thumb-size: 1.125rem;
+  --slider-thumb-radius: 50%;
+  --slider-thumb-bg: hsl(var(--primary));
+  --slider-thumb-border: 2px solid white;
+  --slider-thumb-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --slider-hover-thumb-opacity: 0.9;
+
+  /* Navigation Menu Component Tokens */
+  --navigation-menu-trigger-height: 2.25rem;
+  --navigation-menu-trigger-padding-x: 1rem;
+  --navigation-menu-trigger-padding-y: 0.5rem;
+  --navigation-menu-trigger-radius: var(--radius-md);
+  --navigation-menu-trigger-font-size: 0.875rem;
+  --navigation-menu-trigger-icon-size: 0.75rem;
+  --navigation-menu-trigger-icon-margin-start: 0.25rem;
+  --navigation-menu-viewport-offset: 0.375rem;
+  --navigation-menu-viewport-radius: var(--radius-md);
+  --navigation-menu-content-padding: 0.5rem;
+  --navigation-menu-content-padding-end: 0.625rem;
+  --navigation-menu-content-offset: 0.375rem;
+  --navigation-menu-link-gap: 0.25rem;
+  --navigation-menu-link-padding: 0.5rem;
+  --navigation-menu-link-radius: var(--radius-sm);
+  --navigation-menu-link-font-size: 0.875rem;
+  --navigation-menu-link-icon-size: 1rem;
+  --navigation-menu-indicator-height: 0.375rem;
+  --navigation-menu-indicator-marker-height: 0.5rem;
+  --navigation-menu-indicator-marker-width: 0.5rem;
+  --navigation-menu-indicator-marker-radius: var(--radius-sm);
+  --navigation-menu-indicator-marker-shadow: var(--shadow-md);
+  --navigation-menu-list-gap: 0.25rem;
+
+  /* Label Component Tokens */
+  --label-gap: 0.5rem;
+  --label-font-size: 0.875rem;
+  --label-line-height: 1;
+  --label-font-weight: 500;
+
+  /* Generic Icon Size Tokens */
+  --icon-size-sm: 0.75rem;
+  --icon-size-md: 1.25rem;
+  --icon-size-lg: 1.5rem;
+  --icon-size-xl: 5rem;
+
+  /* Form Component Tokens */
+  --form-fieldset-gap: 0.5rem;
+  --form-field-gap: 0.5rem;
+  --form-element-field-gap: 0.5rem;
+  --form-field-errors-font-size: 0.875rem;
+  --form-field-errors-font-weight: 500;
+  --form-description-font-size: 0.875rem;
+  --form-legend-font-size: 0.875rem;
+  --form-legend-line-height: 1;
+  --form-legend-font-weight: 500;
+
+  /* Container Component Tokens */
+  --container-padding: 1rem;
+  --container-radius: var(--radius-lg);
+  --container-shadow: var(--shadow-xs);
+  --container-transition: var(--transition-default);
+
+  /* Step Indicator Component Tokens */
+  --step-indicator-size: 1.5rem;
+
+  /* Hover Lift Distances (interactive feedback) */
+  --hover-lift-sm: 0.25rem;
+  --hover-lift-md: 0.5rem;
+
+  /* Card Accent Border (top border for visual emphasis) */
+  --card-accent-border: 4px;
+
+  /* Decorative Line Dimensions (section dividers) */
+  --divider-line-width: 5rem;
+  --divider-line-height: 0.25rem;
+
+}
+
+/* ===== KEYFRAMES ===== */
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-in-from-top {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-from-bottom {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Skeleton loading shimmer animation */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* ===== BASE INTERACTIVE TRANSITIONS ===== */
+@layer base {
+  button,
+  a,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    transition: all var(--transition-default);
+  }
+
+  /* Text-balance for headings */
+  h1, h2, h3, h4, h5, h6 {
+    text-wrap: balance;
+  }
+
+  /* Heading base styles */
+  h1, h2, h3 {
+    letter-spacing: var(--tracking-heading);
+    font-feature-settings: "ss01", "ss02";
+  }
+
+  /* Input focus glow */
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 3px hsl(var(--ring) / 0.1);
+    outline: none;
+  }
+
+  /* Placeholder styling */
+  ::placeholder {
+    color: hsl(var(--muted-foreground));
+    opacity: 0.7;
+  }
+}
+
+/* ===== COMPONENT UTILITIES ===== */
+@layer components {
+  .overlay-dark {
+    @apply bg-[rgba(0,0,0,0.5)];
+  }
+  .overlay-light {
+    @apply bg-[rgba(255,255,255,0.7)];
+  }
+  .text-link {
+    @apply text-primary hover:opacity-80;
+  }
+
+  /* Typography weight utilities */
+  .font-ui {
+    @apply font-medium;
+  }
+  .font-body {
+    @apply font-normal;
+  }
+  .font-display {
+    @apply font-semibold;
+  }
+
+  /* Optical sizing for display text */
+  .text-display {
+    font-optical-sizing: auto;
+    letter-spacing: var(--tracking-tight);
+  }
+
+  /* Skeleton loading shimmer */
+  .skeleton-shimmer {
+    animation: shimmer var(--skeleton-animation-duration) infinite;
+    background-size: 1000px 100%;
+  }
+
+  /* Card hover with subtle lift */
+  .card-interactive {
+    transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .card-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+  }
+  .card-interactive:active {
+    transform: translateY(0);
+  }
+
+  /* Button pressed state */
+  .btn-press:active {
+    transform: scale(0.98);
+  }
+
+  /* Default link transitions */
+  a:not([class]) {
+    color: hsl(var(--primary));
+    transition: color 150ms ease, opacity 150ms ease;
+  }
+  a:not([class]):hover {
+    opacity: 0.8;
+  }
+
+}
+
+/* ===== CSS CUSTOM PROPERTIES FOR HSL VALUES ===== */
+:root {
+  /* Smooth theme transition */
+  transition: background-color 300ms ease, color 300ms ease;
+
+  /* ===== LIGHT MODE (Solar Vipani Brand) ===== */
+
+  /* Backgrounds - Warm cream tones */
+  --background: 40 33% 97%;          /* Warm cream - main background */
+  --background-secondary: 40 20% 95%; /* Slightly deeper cream */
+  --background-tertiary: 38 14% 91%; /* Warm tertiary/hover */
+
+  /* Foreground/Text - Warm near-blacks for high contrast */
+  --foreground: 30 8% 10%;           /* Warm dark - primary text */
+  --foreground-secondary: 30 5% 32%; /* Warm gray - secondary text */
+  /* Borders */
+  --border: 35 12% 88%;              /* Warm border */
+  --border-hover: 35 8% 82%;         /* Warm border hover */
+
+  /* Primary - Sun Orange (brand identity) */
+  --primary: 24 100% 50%;           /* #FF6600 */
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: hsl(var(--primary) / 0.9);
+
+  /* Accent = Primary (single brand color) */
+  --accent: var(--primary);
+  --accent-foreground: var(--primary-foreground);
+  --accent-hover: hsl(var(--accent) / 0.9);
+  --accent-muted: 30 100% 93%;      /* #FFECD9 */
+
+  /* Secondary - Hill Green (eco, sustainability) */
+  --secondary: 122 39% 49%;         /* #4CAF50 */
+  --secondary-foreground: 0 0% 100%;
+  --secondary-hover: hsl(var(--secondary) / 0.8);
+  --secondary-muted: 122 39% 92%;   /* #E8F5E9 */
+
+  /* Success = Secondary (green means both eco and success) */
+  --success: var(--secondary);
+  --success-foreground: var(--secondary-foreground);
+  --success-muted: var(--secondary-muted);
+
+  /* Warning - Sun gold */
+  --warning: 42 100% 50%;           /* #FFAA00 */
+  --warning-foreground: 0 0% 9%;
+  --warning-muted: 45 100% 90%;     /* #FFF3CC */
+
+  /* Destructive */
+  --destructive: 0 84% 60%;         /* #EF4444 */
+  --destructive-foreground: 0 0% 100%;
+  --destructive-hover: hsl(var(--destructive) / 0.9);
+  --destructive-muted: 0 93% 94%;   /* #FEE2E2 */
+
+  /* Component surfaces */
+  --card: 0 0% 100%;
+  --card-foreground: 30 8% 10%;
+  --popover: var(--card);
+  --popover-foreground: var(--card-foreground);
+  --muted: 40 15% 95%;
+  --muted-foreground: 30 5% 45%;
+
+  /* Form elements */
+  --input: 35 12% 88%;
+  --ring: var(--primary);
+}
+
+.dark {
+  /* ===== DARK MODE (Solar Vipani Brand) ===== */
+
+  /* Dark mode shadows */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+  /* Backgrounds - Deep warm blacks */
+  --background: 30 6% 6%;            /* Warm dark background */
+  --background-secondary: 30 5% 10%; /* Warm secondary */
+  --background-tertiary: 30 4% 15%;  /* Warm tertiary */
+
+  /* Foreground/Text - Warm bright for contrast */
+  --foreground: 40 20% 97%;          /* Warm light text */
+  --foreground-secondary: 30 5% 64%; /* Warm secondary text */
+  /* Borders - Warm subtle dark borders */
+  --border: 30 5% 18%;               /* Warm dark border */
+  --border-hover: 30 4% 25%;         /* Warm dark border hover */
+
+  /* Accent overrides (accent inherits --primary via var()) */
+  --accent-hover: 24 100% 50%;
+  --accent-muted: 24 60% 20%;       /* #522600 - Dark orange bg */
+
+  /* Secondary - Hill Green (brighter in dark mode) */
+  --secondary: 122 50% 55%;         /* #5DC060 - Brighter green */
+  --secondary-hover: 122 50% 50%;
+  --secondary-foreground: 0 0% 100%;
+  --secondary-muted: 122 40% 18%;   /* #1A3D1B - Dark green bg */
+  /* success inherits --secondary via var() */
+
+  --warning: 42 100% 55%;           /* Sun gold - brighter */
+  --warning-foreground: 0 0% 9%;
+  --warning-muted: 42 50% 18%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --destructive-muted: 0 40% 15%;
+
+  /* Primary brand color - brighter in dark */
+  --primary: 24 100% 55%;
+  --primary-foreground: 0 0% 100%;
+  /* ring inherits --primary via var() */
+
+  /* Component surfaces */
+  --card: 30 5% 10%;
+  --card-foreground: 40 20% 97%;
+  /* popover inherits --card via var() */
+  --muted: 30 4% 15%;
+  --muted-foreground: 30 5% 64%;
+
+  /* Form elements */
+  --input: 30 5% 18%;
+}
+
+/* ===== BASE STYLES ===== */
+*,
+*::before,
+*::after {
+  border-color: hsl(var(--border));
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Remove default link underlines */
+a {
+  text-decoration: none;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus visible ring */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / 0.5);
+  transition: box-shadow var(--transition-default);
+}
+
+/* Selection styling */
+::selection {
+  background-color: hsl(var(--accent) / 0.15);
+  color: inherit;
+}
+
+/* ===== UTILITY CLASSES ===== */
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Subtle scrollbar for dark mode */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--border-hover));
+}
+
+/* ===== REDUCED MOTION SUPPORT ===== */
+/* Respects user's motion preferences for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+

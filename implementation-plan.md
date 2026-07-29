@@ -22,7 +22,7 @@ can resume from the checklist without re-reading the Svelte codebase.
 
 ## Progress
 
-- [ ] **Phase 0** — Scaffold: Vite + React + TS + Tailwind v4 + shadcn/ui
+- [x] **Phase 0** — Scaffold: Vite + React + TS + Tailwind v4 + shadcn/ui
 - [ ] **Phase 1** — Types and the NDJSON stream client (pure TS, no React)
 - [ ] **Phase 2** — Zustand store: messages, lead profile, persistence
 - [ ] **Phase 3** — Static chat UI: list, bubble, composer
@@ -60,27 +60,38 @@ Settled at planning time. Revisit only with a note in the Session log explaining
 **Goal:** an empty React app that builds, lints, and renders the design tokens correctly
 in light and dark mode.
 
-- [ ] `npm create vite@latest . -- --template react-ts` in `~/Developer/solar-agent-frontend`
-- [ ] `git init` — the directory is not currently a git repo
-- [ ] Install Tailwind v4: `tailwindcss @tailwindcss/vite`, wire the Vite plugin
-- [ ] Copy `src/app.css` from the Svelte app → `src/index.css`. It is plain CSS
+- [x] `npm create vite@latest . -- --template react-ts` in `~/Developer/solar-agent-frontend`
+- [x] ~~`git init`~~ — not needed, the directory was already a git repo on `main`
+- [x] Install Tailwind v4: `tailwindcss @tailwindcss/vite`, wire the Vite plugin
+- [x] Copy `src/app.css` from the Svelte app → `src/index.css`. It is plain CSS
       (`@theme`, `:root`, `.dark`, `@layer`, `@keyframes`) and needs no translation.
       Strip only rules that target Svelte-only markup, if any survive a visual check.
-- [ ] Set up `@/*` path alias in `tsconfig.json` **and** `vite.config.ts`
-      (replaces SvelteKit's `$lib`)
-- [ ] `npx shadcn@latest init`, then add: `button textarea card badge input label select dialog`
-- [ ] Install runtime deps: `zustand react-markdown remark-gfm rehype-raw lucide-react`
-- [ ] Create `.env` with `VITE_API_BASE_URL=` (declared but **empty** — see §B)
-- [ ] Create `src/lib/api.ts` exporting `apiUrl(path)`, mirroring the Svelte helper
-- [ ] Configure the Vite dev proxy for `/api/chatbot`, `/api/transcribe`,
+      *No Svelte-only rules existed. The file now differs from the original by exactly
+      one 8-line header; it is in `.prettierignore` to keep that diff readable.*
+- [x] Set up `@/*` path alias in `tsconfig.json` **and** `vite.config.ts`
+      (replaces SvelteKit's `$lib`). *Needed in `tsconfig.app.json` for the compiler
+      and in `tsconfig.json` for the shadcn CLI — see Session log.*
+- [x] `npx shadcn@latest init`, then add: `button textarea card badge input label select dialog`
+- [x] Install runtime deps: `zustand react-markdown remark-gfm rehype-raw lucide-react`
+- [x] Create `.env` with `VITE_API_BASE_URL=` (declared but **empty** — see §B).
+      *Also `.env.example`, since `.gitignore` excludes `.env`. Typed in `src/env.d.ts`.*
+- [x] Create `src/lib/api.ts` exporting `apiUrl(path)`, mirroring the Svelte helper
+- [x] Configure the Vite dev proxy for `/api/chatbot`, `/api/transcribe`,
       `/api/speak`, `/api/generate-cad` → `http://localhost:8000` (see §B)
-- [ ] Add ESLint + Prettier
-- [ ] Verify dark mode: the Svelte app toggles a `.dark` class on `<html>`.
+- [x] ~~Add ESLint~~ + Prettier — **oxlint** + Prettier instead; see Session log
+- [x] Verify dark mode: the Svelte app toggles a `.dark` class on `<html>`.
       Add a minimal theme toggle or hardcode light for now; full theming is Phase 10.
+      *Minimal toggle lives inline in `App.tsx`; `@custom-variant dark` added to
+      `index.css` so shadcn's own `dark:` utilities follow the class too.*
 
 **Done when:** `npm run dev` serves a page whose background is the warm cream
 `--background: 40 33% 97%` and where a shadcn `<Button>` renders in Sun Orange
 `--primary: 24 100% 50%`.
+
+**Verified 2026-07-29** in the browser against `npm run dev`: computed `body`
+background `rgb(250, 248, 245)` and default `<Button>` background `rgb(255, 102, 0)`
+(= `#FF6600`). Light and dark both screenshotted. `npm run build`, `npm run lint` and
+`npm run format:check` all clean.
 
 ---
 
@@ -523,3 +534,6 @@ happen.
 | Date | Phase | Notes |
 | --- | --- | --- |
 | 2026-07-29 | — | Plan written. Svelte source and backend contract surveyed; all decisions in the table above locked. No code written yet. |
+| 2026-07-29 | 0 | Scaffold done and verified. Deviations from the plan, all agreed at the time: (1) **oxlint, not ESLint** — `create-vite` v9 ships oxlint by default and the scaffold arrives pre-wired with the react-hooks rules; adding ESLint meant removing that and taking on ~8 devDeps plus a flat config for no gain here. (2) **`"strict": true` added explicitly** to `tsconfig.app.json` — the v9 scaffold no longer sets it and I could not confirm TS 6 makes it the default; `LeadProfile` is all-nullable, so this matters. (3) `git init` skipped, repo already existed. |
+| 2026-07-29 | 0 | Three scaffold traps worth remembering. (a) `shadcn init` **rewrote the brand palette in place** — it replaced every HSL token with its own neutral oklch values while leaving the original comments, so `--primary` read `oklch(0.205 0 0) /* #FF6600 */`. Restored `index.css` from the Svelte original and re-added only the two imports shadcn actually needs (`tw-animate-css`, `shadcn/tailwind.css`); its `@layer base` reset and `@theme inline` block were both dropped, the first because the ported CSS already does all of it, the second because it maps `--color-*` to the bare token and would break the `hsl()` wrapper the HSL triplets require. **Re-run `shadcn add` with care — check `git diff src/index.css` afterwards.** (b) The CLI reads the **root `tsconfig.json`**, which in the v9 scaffold is solution-style with no `compilerOptions`; without `paths` duplicated there it silently writes components into a literal `@/` directory. (c) A stale lockfile left `tslib` (a `recast` dep) uninstalled and every `shadcn add` crashed — `rm -rf node_modules package-lock.json && npm install` fixed it. |
+| 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |
