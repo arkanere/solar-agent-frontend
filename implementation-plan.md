@@ -25,7 +25,7 @@ can resume from the checklist without re-reading the Svelte codebase.
 - [x] **Phase 0** — Scaffold: Vite + React + TS + Tailwind v4 + shadcn/ui
 - [x] **Phase 1** — Types and the NDJSON stream client (pure TS, no React)
 - [x] **Phase 2** — Zustand store: messages, lead profile, persistence
-- [ ] **Phase 3** — Static chat UI: list, bubble, composer
+- [x] **Phase 3** — Static chat UI: list, bubble, composer
 - [ ] **Phase 4** — Wire streaming: send, stop, retry, regenerate
 - [ ] **Phase 5** — Markdown rendering and message metadata
 - [ ] **Phase 6** — Voice: recorder and speech playback
@@ -176,24 +176,40 @@ of throwing at boot. `tsc -b`, `npm run lint` and `prettier --check` clean.
 
 **Goal:** the full visual layout, rendering messages from the store. No network yet.
 
-- [ ] `src/components/chat/ChatBox.tsx` — header (title, copy, close), scrollable
+- [x] `src/components/chat/ChatBox.tsx` — header (title, copy, close), scrollable
       history, composer, reset footer
-- [ ] `src/components/chat/MessageBubble.tsx` — avatar for assistant, card, timestamp,
-      hover action row (copy / regenerate), `Stopped` badge
-- [ ] `src/components/chat/Composer.tsx` — textarea with **auto-grow**
+- [x] `src/components/chat/MessageBubble.tsx` — avatar for assistant, card, timestamp,
+      hover action row (copy / regenerate), `Stopped` badge. *Also the error state and
+      its Retry button: `error` and `userMessage` are already on `ChatMessage`, and
+      Phase 4 only wires the handler.*
+- [x] `src/components/chat/Composer.tsx` — textarea with **auto-grow**
       (reset `height` to `auto`, then set to `scrollHeight`; capped by max-height in CSS)
-- [ ] Enter sends, Shift+Enter newlines
-- [ ] Starter prompt chips, shown only until the first user message (§D)
-- [ ] Typing indicator (three pulsing dots) while loading
-- [ ] Scroll anchoring: auto-scroll to bottom unless the user has scrolled up
+- [x] Enter sends, Shift+Enter newlines. *Enter is ignored while `isComposing`, or an
+      IME candidate window's commit keystroke sends the message mid-word.*
+- [x] Starter prompt chips, shown only until the first user message (§D)
+- [x] Typing indicator (three pulsing dots) while loading
+- [x] Scroll anchoring: auto-scroll to bottom unless the user has scrolled up
       more than 100px; re-arm when they come back within 20px of the bottom
-- [ ] `src/lib/format.ts` — port `formatCurrency`, `formatNumber`, `formatLakh`,
+- [x] `src/lib/format.ts` — port `formatCurrency`, `formatNumber`, `formatLakh`,
       `formatThousand`, `humanizeToolName`, `formatTime` (plain TS, copies over directly)
-- [ ] Accessibility on the history container: `role="log"`, `aria-live="polite"`,
+      *— reimplemented, not copied; the Svelte tree is not on this machine. See log.*
+- [x] Accessibility on the history container: `role="log"`, `aria-live="polite"`,
       `aria-atomic="false"`, `aria-busy`
 
 **Done when:** seeding the store with a handful of fake messages renders a chat that is
 visually indistinguishable from the Svelte version side by side.
+
+**Verified 2026-07-31** in the browser against `npm run dev`, with a 20-message fixture
+seeded into `localStorage` — but **not** side by side with the Svelte version, which is
+not checked out here (see Session log). What was exercised: cold conversation shows the
+greeting plus all four starter chips; clicking a chip sends it and the chips disappear;
+Shift+Enter inserts a newline and the newline survives into the bubble, Enter sends and
+clears; the textarea grows line by line and stops at the 8rem cap; `Stopped` badge and
+the error bubble with Retry both render; the copy action appears on hover and Regenerate
+is correctly absent on a message that is not the last; scrolled up, a new message does
+**not** yank the view down, and after scrolling back to the bottom the next one does; the
+typing indicator renders while `isLoading`; dark mode checked on the same transcript.
+`npm run build`, `npm run lint`, `prettier --check src` clean, console clean on reload.
 
 ---
 
@@ -585,4 +601,7 @@ happen.
 | 2026-07-31 | 2 | Store done and verified. One conflict inside the phase spec itself: `persist` writes **one** key holding a `{ state, version }` envelope, but the phase also requires the Svelte app's **three bare keys** with `chatVoiceOutput` as `"1"`/`"0"`. Kept the middleware and gave it a custom `PersistStorage` (`chatStorage`) that fans out to the three keys on write and reassembles the slice on read — carrying a live session between the two implementations only works if the on-disk format matches exactly. It is typed against the partialized slice, so a new persisted field has to be added to `partialize` **and** to both halves of the adapter. |
 | 2026-07-31 | 2 | Three judgement calls in the store, all flagged rather than assumed. (1) **`reset()` does not clear `voiceOutputEnabled`** — it is a persisted *mode* the user chose, not conversation state, and Phase 6 states as much. (2) **`setLeadProfile` merges a `Partial`** rather than replacing wholesale; every caller (context updates, lead-form prefill) knows a few fields, none knows all twenty. (3) `applyContextUpdates` writes through `patch[field] = value as never` — the map's value type is `keyof LeadProfile`, so TS cannot tie a key to its own field type. It means a wrongly-typed server value (`hasDocuments: "yes"`) would be stored as-is; if that ever bites, the fix is per-field coercion, not a bigger cast. |
 | 2026-07-31 | 2 | Scratch verification could not run from the scratchpad: the store imports `@/lib/types`, and resolving that alias needs the repo's `tsconfig.json`, so the script ran from the repo root as a `.mts` (`type: module` is set there; a `.ts` in the scratchpad transpiles as CJS and rejects top-level `await`) and was deleted afterwards. Node 24 has no `localStorage` without `--experimental-webstorage`, so the script defines one over a `Map`. Phase 9 gets this for free from jsdom. |
+| 2026-07-31 | 3 | **The Svelte original is no longer on this machine** — `~/Developer/svelte/solar-app` does not exist, so §A's source map cannot be followed and nothing in Phase 3 was ported by reading it. Everything came from this document's §D instead, which is what it was written for. Two consequences. (1) Phase 3's "visually indistinguishable side by side" could not be run as written; the UI was verified against the spec, not against the original. (2) `format.ts` was **reimplemented from the function names**, so `formatLakh` (`₹2.5 L`), `formatThousand` (`₹18.5 K`) and `humanizeToolName` (`Generate CAD Drawing`, via a small acronym set so CAD/ROI/kWh do not render as "Cad") are my reading of the intent, not the original's output. They are unused until Phase 7 — **check them against a real widget then**, or against the deployed site. `formatCurrency`/`formatNumber` are `en-IN` `Intl` calls and are not in doubt. All of them take `string \| null \| undefined` and return an em dash, because tool payloads are loosely typed and `₹NaN` in a quotation is worse than a blank. |
+| 2026-07-31 | 3 | Judgement calls. (1) `ChatBox` reads the store directly but takes `onSend`/`onStop`/`onRetry`/`onRegenerate` as props — Phase 4 supplies them from `useChat` without the component having to change. The action props are optional, and each affordance renders only when its handler exists, so nothing in the demo host is a dead button. (2) The scroll-anchoring flag is a **ref, not state**: it changes on every scroll event and no render reads it. (3) `App.tsx` lost the scaffold token gallery; its `onSend` only records the customer's turn until Phase 4. (4) Message content is rendered as plain text with `whitespace-pre-wrap`, so the welcome message currently shows its literal `<p>` tags — that is Phase 5's job and not a bug. |
+| 2026-07-31 | 3 | Worth knowing: the dev server came up with a **transcript already in `localStorage`** from the Svelte app on the same origin (both dev on `:5173`), and the React app rendered it — unplanned but real proof that Phase 2's shared-key persistence carries a session across the two implementations. Verification then overwrote `chatMessages` with a fixture and cleared it afterwards, so that Svelte session is gone. If a stored transcript ever matters, back the key up before running the React dev server. |
 | 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |

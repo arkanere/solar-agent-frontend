@@ -1,19 +1,15 @@
 import { useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { ChatBox } from '@/components/chat/ChatBox';
+import { useChatStore } from '@/store/chatStore';
 
-// Scaffold verification page. Phase 8 replaces this with the real demo host.
-// It exists to prove the ported design tokens resolve and that shadcn primitives
-// pick up the Solar Vipani palette rather than shadcn's own neutral defaults.
+// Demo host page. Phase 8 adds the popup mount alongside this one.
 export default function App() {
   // Theming keys off a `.dark` class on <html>, matching the Svelte app. A full
   // toggle with persistence and system-preference following lands in Phase 10.
   const [dark, setDark] = useState(false);
+  const appendMessage = useChatStore((s) => s.appendMessage);
 
   const toggleTheme = () => {
     setDark((current) => {
@@ -22,43 +18,24 @@ export default function App() {
     });
   };
 
-  return (
-    <main className="min-h-screen bg-background p-8 text-foreground">
-      <div className="mx-auto flex max-w-2xl flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Solar Agent Frontend</h1>
-          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-pressed={dark}>
-            {dark ? <Sun /> : <Moon />}
-            <span className="sr-only">Toggle theme</span>
-          </Button>
-        </div>
+  // Phase 4 replaces this with `useChat`. Until then sending only records the
+  // customer's turn, which is enough to exercise the transcript and the chips.
+  const handleSend = (text: string) => {
+    appendMessage({ role: 'user', content: text, timestamp: Date.now() });
+  };
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Design tokens</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button>Primary</Button>
-              <Button variant="secondary">Secondary</Button>
-              <Button variant="outline">Outline</Button>
-              <Button variant="destructive">Destructive</Button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge>Badge</Badge>
-              <Badge variant="secondary">Secondary</Badge>
-              <Badge variant="outline">Outline</Badge>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="scaffold-input">Input</Label>
-              <Input id="scaffold-input" placeholder="Type something" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="scaffold-textarea">Textarea</Label>
-              <Textarea id="scaffold-textarea" placeholder="Type something longer" />
-            </div>
-          </CardContent>
-        </Card>
+  return (
+    <main className="flex min-h-screen flex-col items-center gap-4 bg-background p-4 text-foreground sm:p-8">
+      <div className="flex w-full max-w-4xl items-center justify-between">
+        <h1 className="text-lg font-semibold">Solar Vipani</h1>
+        <Button variant="ghost" size="icon" onClick={toggleTheme} aria-pressed={dark}>
+          {dark ? <Sun /> : <Moon />}
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </div>
+
+      <div className="h-[85vh] w-full max-w-4xl overflow-hidden rounded-xl border border-border shadow-sm">
+        <ChatBox onSend={handleSend} />
       </div>
     </main>
   );
