@@ -2,26 +2,20 @@ import { useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatBox } from '@/components/chat/ChatBox';
-import { useChatStore } from '@/store/chatStore';
+import { useChat } from '@/hooks/useChat';
 
 // Demo host page. Phase 8 adds the popup mount alongside this one.
 export default function App() {
   // Theming keys off a `.dark` class on <html>, matching the Svelte app. A full
   // toggle with persistence and system-preference following lands in Phase 10.
   const [dark, setDark] = useState(false);
-  const appendMessage = useChatStore((s) => s.appendMessage);
+  const { send, stop, retry, regenerate, reset } = useChat();
 
   const toggleTheme = () => {
     setDark((current) => {
       document.documentElement.classList.toggle('dark', !current);
       return !current;
     });
-  };
-
-  // Phase 4 replaces this with `useChat`. Until then sending only records the
-  // customer's turn, which is enough to exercise the transcript and the chips.
-  const handleSend = (text: string) => {
-    appendMessage({ role: 'user', content: text, timestamp: Date.now() });
   };
 
   return (
@@ -35,7 +29,13 @@ export default function App() {
       </div>
 
       <div className="h-[85vh] w-full max-w-4xl overflow-hidden rounded-xl border border-border shadow-sm">
-        <ChatBox onSend={handleSend} />
+        <ChatBox
+          onSend={send}
+          onStop={stop}
+          onRetry={retry}
+          onRegenerate={regenerate}
+          onReset={reset}
+        />
       </div>
     </main>
   );

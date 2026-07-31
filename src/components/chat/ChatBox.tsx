@@ -28,6 +28,9 @@ export interface ChatBoxProps {
   onStop?: () => void;
   onRetry?: (index: number) => void;
   onRegenerate?: (index: number) => void;
+  /** Clearing has to abort an in-flight turn as well as empty the transcript,
+   * which only the chat hook can do. Falls back to the store's own reset. */
+  onReset?: () => void;
   /** Supplied by the popup host in Phase 8; absent on the full-page chat. */
   onClose?: () => void;
 }
@@ -51,6 +54,7 @@ export function ChatBox({
   onStop,
   onRetry,
   onRegenerate,
+  onReset,
   onClose,
 }: ChatBoxProps) {
   const messages = useChatStore((s) => s.messages);
@@ -180,9 +184,8 @@ export function ChatBox({
         <Button
           variant="ghost"
           size="xs"
-          onClick={reset}
+          onClick={onReset ?? reset}
           className="text-muted-foreground"
-          disabled={isLoading}
         >
           <Trash2 />
           Clear conversation

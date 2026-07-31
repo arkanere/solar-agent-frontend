@@ -217,31 +217,48 @@ typing indicator renders while `isLoading`; dark mode checked on the same transc
 
 **Goal:** a real conversation against the local backend.
 
-- [ ] `src/hooks/useChat.ts` — owns `runChat(text, { appendUser })` and an
+- [x] `src/hooks/useChat.ts` — owns `runChat(text, { appendUser })` and an
       `AbortController` in a ref
-- [ ] Snapshot prior turns **before** appending the current message, so the server gets
+- [x] Snapshot prior turns **before** appending the current message, so the server gets
       real multi-turn context. When `appendUser` is false (retry/regenerate), also drop
       the trailing user turn from the snapshot — it is sent separately as `userMessage`.
-- [ ] Buffer `intent`, `context`, `questions`, `tool` events that arrive **before** the
+- [x] Buffer `intent`, `context`, `questions`, `tool` events that arrive **before** the
       first `delta` — there is no assistant message to attach them to yet. Flush on
       stream end. `sources` and `usage` arrive after the last delta.
-- [ ] Deliberately **drop `questions` events.** They are slot-filling prompts for the
+      *`context` is not buffered — it is profile state, applied immediately.*
+- [x] Deliberately **drop `questions` events.** They are slot-filling prompts for the
       *assistant* to ask the customer; rendering them as "you might also ask" chips
       offers the customer "May I have your name?" as something to ask us. The Svelte
       app removed this on purpose — do not reinstate it.
-- [ ] Stop: abort keeps the partial reply and marks the message `stopped: true`.
+- [x] Stop: abort keeps the partial reply and marks the message `stopped: true`.
       `AbortError` is a user action, not a failure.
-- [ ] Error: append an assistant message with `error: true` and `userMessage: text`
+- [x] Error: append an assistant message with `error: true` and `userMessage: text`
       so Retry knows what to resend
-- [ ] Retry: drop the failed message, re-run with `appendUser: false`
-- [ ] Regenerate: truncate to before the last assistant turn, find the preceding user
+- [x] Retry: drop the failed message, re-run with `appendUser: false`
+- [x] Regenerate: truncate to before the last assistant turn, find the preceding user
       turn, re-run with `appendUser: false`
-- [ ] Reset: abort in flight, stop recorder and speech, clear localStorage, re-greet —
+- [x] Reset: abort in flight, stop recorder and speech, clear localStorage, re-greet —
       so a late chunk cannot write into the fresh conversation
+      *Recorder and speech do not exist until Phase 6 — noted in the hook.*
 
 **Done when:** with `solar-agent-backend` running locally (`uv run uvicorn app.main:app
 --reload`), a question streams in token by token, stop truncates cleanly, and retry and
 regenerate both produce a fresh answer.
+
+**Not yet run against the real backend** — hence the phase box above is still open.
+Everything else was verified 2026-07-31 in the browser against a throwaway mock NDJSON
+server on `:8000` speaking §C's contract through the same Vite proxy: deltas render token
+by token and the starter chips clear; `intent` arriving before the first delta lands on
+the message, `sources`/`usage` arriving after it land too; `context` updates reach the
+lead profile and the profile then goes back up on the next request; a `questions` event
+and an unknown event type are both ignored without incident; Stop keeps the partial reply
+and marks it `stopped`; an `error` event produces the error bubble with Retry, and Retry
+re-sends the same `userMessage` with the failed turn absent from `history`; Regenerate
+replaces the last reply in place and leaves the question above it; a tool-only turn with
+no delta at all still flushes its buffered metadata into a message; and Clear during a
+live stream leaves exactly the greeting with no late chunk writing into it. Console clean
+apart from the two deliberate failures. `tsc -b`, `npm run lint`, `prettier --check` and
+`npm run build` all clean.
 
 ---
 
@@ -604,4 +621,7 @@ happen.
 | 2026-07-31 | 3 | **The Svelte original is no longer on this machine** — `~/Developer/svelte/solar-app` does not exist, so §A's source map cannot be followed and nothing in Phase 3 was ported by reading it. Everything came from this document's §D instead, which is what it was written for. Two consequences. (1) Phase 3's "visually indistinguishable side by side" could not be run as written; the UI was verified against the spec, not against the original. (2) `format.ts` was **reimplemented from the function names**, so `formatLakh` (`₹2.5 L`), `formatThousand` (`₹18.5 K`) and `humanizeToolName` (`Generate CAD Drawing`, via a small acronym set so CAD/ROI/kWh do not render as "Cad") are my reading of the intent, not the original's output. They are unused until Phase 7 — **check them against a real widget then**, or against the deployed site. `formatCurrency`/`formatNumber` are `en-IN` `Intl` calls and are not in doubt. All of them take `string \| null \| undefined` and return an em dash, because tool payloads are loosely typed and `₹NaN` in a quotation is worse than a blank. |
 | 2026-07-31 | 3 | Judgement calls. (1) `ChatBox` reads the store directly but takes `onSend`/`onStop`/`onRetry`/`onRegenerate` as props — Phase 4 supplies them from `useChat` without the component having to change. The action props are optional, and each affordance renders only when its handler exists, so nothing in the demo host is a dead button. (2) The scroll-anchoring flag is a **ref, not state**: it changes on every scroll event and no render reads it. (3) `App.tsx` lost the scaffold token gallery; its `onSend` only records the customer's turn until Phase 4. (4) Message content is rendered as plain text with `whitespace-pre-wrap`, so the welcome message currently shows its literal `<p>` tags — that is Phase 5's job and not a bug. |
 | 2026-07-31 | 3 | Worth knowing: the dev server came up with a **transcript already in `localStorage`** from the Svelte app on the same origin (both dev on `:5173`), and the React app rendered it — unplanned but real proof that Phase 2's shared-key persistence carries a session across the two implementations. Verification then overwrote `chatMessages` with a fixture and cleared it afterwards, so that Svelte session is gone. If a stored transcript ever matters, back the key up before running the React dev server. |
+| 2026-07-31 | 4 | Streaming wired. **Verified against a mock backend, not the real one** — `~/Developer/solar-agent-backend` exists but this session could not read it (the sandbox refused to list the directory, so its `.env` and whether it can start at all are unknown), and running the real agent costs model calls. The mock spoke §C's event ordering exactly, including a `questions` event and an unknown type, and every branch of the hook was exercised through it. **The one thing still outstanding for this phase is a single run against `uv run uvicorn app.main:app --reload`** — the wiring is contract-level identical, so what that would catch is a contract drift in §C, not a bug in the hook. |
+| 2026-07-31 | 4 | Judgement calls in `useChat`. (1) **A failed turn patches the partial reply rather than appending a second message.** The plan says "append an assistant message with `error: true`", which is right when nothing streamed, but appending when half a reply is already on screen leaves an orphaned partial above the error. So: if deltas arrived, the error line is appended to that message's own content and it is marked `error`; if none did, a fresh message is appended. Retry drops the message either way, so the partial is discarded on retry — that is the correct outcome, since the retried turn re-answers from scratch. (2) **`context` events are not buffered** with the rest. They are lead-profile state, not message metadata; holding one back until a delta arrives would mean losing it entirely on a turn that streams nothing. (3) **Stop does not bump the run counter, reset does.** Both abort, but a stopped turn's partial must land and a cleared turn's must not, so the fence is on `reset` alone. (4) A turn that emits no delta but did emit `tool`/`intent` flushes into an assistant message with **empty content** — a tool-only turn is a real outcome, and Phase 7 renders the widget with no prose above it. |
+| 2026-07-31 | 4 | Two things worth knowing. (1) **The welcome message goes up in `history`** as an assistant turn, raw `<p>` tags and all. It is what the customer actually saw, and `toHistory` was built in Phase 1 to pass everything non-error through, so this is deliberate rather than overlooked — but it is a few tokens of markup on every request, and stripping it is a one-line change if it ever reads badly in a prompt dump. (2) `ChatBox` gained an `onReset` prop and **lost `disabled={isLoading}` on Clear conversation** — clearing mid-stream is now allowed, which is the whole point of aborting in `reset`. |
 | 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |
