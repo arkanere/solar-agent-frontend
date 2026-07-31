@@ -3,6 +3,7 @@ import { Check, Copy, Sun, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Composer } from '@/components/chat/Composer';
 import { MessageBubble } from '@/components/chat/MessageBubble';
+import { stripHtml } from '@/lib/format';
 import { useChatStore } from '@/store/chatStore';
 
 /** Openers for a cold conversation. Hidden the moment the customer says anything. */
@@ -86,9 +87,23 @@ export function ChatBox({
 
   const hasUserSpoken = messages.some((m) => m.role === 'user');
 
+  /**
+   * The conversation as something a customer can paste into an email or a
+   * WhatsApp message. Markup is flattened rather than carried across — the
+   * welcome message is raw HTML, and replies contain markdown that reads badly
+   * as source. Citations are appended per turn, since the links are the part
+   * most worth keeping and nothing else in plain text preserves them.
+   */
   const copyTranscript = async () => {
     const text = messages
-      .map((m) => `${m.role === 'user' ? 'You' : 'Assistant'}: ${m.content}`)
+      .map((m) => {
+        const speaker = m.role === 'user' ? 'You' : 'Assistant';
+        const body = stripHtml(m.content);
+        const citations = m.sources?.length
+          ? '\n' + m.sources.map((s) => `  - ${s.title || s.url}: ${s.url}`).join('\n')
+          : '';
+        return `${speaker}: ${body}${citations}`;
+      })
       .join('\n\n');
     try {
       await navigator.clipboard.writeText(text);

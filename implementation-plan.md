@@ -27,7 +27,7 @@ can resume from the checklist without re-reading the Svelte codebase.
 - [x] **Phase 2** — Zustand store: messages, lead profile, persistence
 - [x] **Phase 3** — Static chat UI: list, bubble, composer
 - [ ] **Phase 4** — Wire streaming: send, stop, retry, regenerate
-- [ ] **Phase 5** — Markdown rendering and message metadata
+- [x] **Phase 5** — Markdown rendering and message metadata
 - [ ] **Phase 6** — Voice: recorder and speech playback
 - [ ] **Phase 7** — Tool-result widgets (13 components)
 - [ ] **Phase 8** — App shell: full-page chat + popup dialog
@@ -264,19 +264,35 @@ apart from the two deliberate failures. `tsc -b`, `npm run lint`, `prettier --ch
 
 ## Phase 5 — Markdown and message metadata
 
-- [ ] Replace plain-text rendering with `react-markdown` + `remark-gfm` + `rehype-raw`
-- [ ] Style the rendered output to match: `ul` disc / `ol` decimal with `pl-5`,
+- [x] Replace plain-text rendering with `react-markdown` + `remark-gfm` + `rehype-raw`
+      *in `Markdown.tsx`, hardened — see below and the Session log.*
+- [x] Style the rendered output to match: `ul` disc / `ol` decimal with `pl-5`,
       `h4` semibold, `p` with `my-1`, links underlined in primary, `strong` semibold
-- [ ] `src/components/chat/IntentBadge.tsx` — intent label map + journey stage map,
+- [x] `src/components/chat/IntentBadge.tsx` — intent label map + journey stage map,
       confidence badge only above 0.8 (§D)
-- [ ] `src/components/chat/TokenUsage.tsx` — in/out/total + `costINR` to 4 dp
-- [ ] Sources block: bordered top section, links `target="_blank" rel="noopener noreferrer"`
-- [ ] Per-message copy: copy the **markdown source**, not the rendered node
-- [ ] Conversation transcript export: strip HTML to plain text, append each assistant
-      turn's citations, write to clipboard
+      *Maps taken from the backend's own `app/schemas/intents.py` — see §D.*
+- [x] `src/components/chat/TokenUsage.tsx` — in/out/total + `costINR` to 4 dp
+- [x] Sources block: bordered top section, links `target="_blank" rel="noopener noreferrer"`
+- [x] Per-message copy: copy the **markdown source**, not the rendered node
+- [x] Conversation transcript export: strip HTML to plain text, append each assistant
+      turn's citations, write to clipboard *(`stripHtml` in `format.ts`)*
 
 **Done when:** a reply containing a list, bold text and a link renders correctly, and the
 intent/usage rows appear beneath it.
+
+**Verified 2026-07-31** in the browser against `npm run dev` with a seeded fixture: a
+reply with an h3, bold, italics, inline code, a bulleted list, a numbered list, a link and
+a GFM table renders correctly, with the sources block and the intent/usage row beneath it;
+the welcome message renders as a paragraph rather than literal `<p>` tags; the customer's
+own turn keeps its newlines and its literal asterisks (it is not run through markdown);
+the confidence figure shows at 0.91 and is withheld at 0.42; an intent name absent from
+the map falls back to a title-cased label. Dark mode checked on the same transcript.
+Injection attempt — `<script>`, `<img onerror>`, `<a href="javascript:">`, `<a onclick>`
+and `<iframe>` in one reply — produced no script/img/iframe elements, no `on*` attributes,
+an emptied `href`, and no global set; the `<script>` body does not surface as text either.
+`stripHtml` checked directly: entities decoded, block boundaries become newlines, plain
+markdown passes through untouched. `tsc -b`, `npm run lint`, `prettier --check` and
+`npm run build` clean; console clean on reload.
 
 ---
 
@@ -555,6 +571,27 @@ this map means the agent will keep re-asking for it, so warn in dev:
 | *anything else* | `GenericToolDisplay` |
 | `collect_customer_info`, `scrape_website` | **render nothing** |
 
+**Intent and journey-stage enums**, from the backend's `app/schemas/intents.py`. These
+are the complete sets the `intent` event can carry, and `IntentBadge` maps every one of
+them to a customer-facing label. A value outside these lists means the backend enum has
+grown; the badge title-cases the raw name rather than showing nothing.
+
+```
+JourneyStage: awareness | consideration | decision | installation | support
+
+UserIntent
+  awareness:      general_inquiry, how_solar_works, benefits_inquiry
+  consideration:  pricing_inquiry, system_sizing, roi_calculation, subsidy_inquiry,
+                  technical_question, comparison_request
+  decision:       request_quotation, book_site_visit, financing_inquiry,
+                  eligibility_check, installer_inquiry
+  installation:   request_cad_drawing, installation_timeline, document_request
+  support:        maintenance_inquiry, troubleshooting, contact_request, other
+```
+
+The same file's `CustomerContext` is the authoritative source for `CONTEXT_TO_PROFILE`
+above, and confirms the ten keys listed there are the complete set the server sends.
+
 **localStorage keys:** `chatMessages`, `leadProfile`, `chatVoiceOutput` (`"1"` / `"0"`).
 
 **Welcome message** (raw HTML, hence `rehype-raw`):
@@ -624,4 +661,8 @@ happen.
 | 2026-07-31 | 4 | Streaming wired. **Verified against a mock backend, not the real one** — `~/Developer/solar-agent-backend` exists but this session could not read it (the sandbox refused to list the directory, so its `.env` and whether it can start at all are unknown), and running the real agent costs model calls. The mock spoke §C's event ordering exactly, including a `questions` event and an unknown type, and every branch of the hook was exercised through it. **The one thing still outstanding for this phase is a single run against `uv run uvicorn app.main:app --reload`** — the wiring is contract-level identical, so what that would catch is a contract drift in §C, not a bug in the hook. |
 | 2026-07-31 | 4 | Judgement calls in `useChat`. (1) **A failed turn patches the partial reply rather than appending a second message.** The plan says "append an assistant message with `error: true`", which is right when nothing streamed, but appending when half a reply is already on screen leaves an orphaned partial above the error. So: if deltas arrived, the error line is appended to that message's own content and it is marked `error`; if none did, a fresh message is appended. Retry drops the message either way, so the partial is discarded on retry — that is the correct outcome, since the retried turn re-answers from scratch. (2) **`context` events are not buffered** with the rest. They are lead-profile state, not message metadata; holding one back until a delta arrives would mean losing it entirely on a turn that streams nothing. (3) **Stop does not bump the run counter, reset does.** Both abort, but a stopped turn's partial must land and a cleared turn's must not, so the fence is on `reset` alone. (4) A turn that emits no delta but did emit `tool`/`intent` flushes into an assistant message with **empty content** — a tool-only turn is a real outcome, and Phase 7 renders the widget with no prose above it. |
 | 2026-07-31 | 4 | Two things worth knowing. (1) **The welcome message goes up in `history`** as an assistant turn, raw `<p>` tags and all. It is what the customer actually saw, and `toHistory` was built in Phase 1 to pass everything non-error through, so this is deliberate rather than overlooked — but it is a few tokens of markup on every request, and stripping it is a one-line change if it ever reads badly in a prompt dump. (2) `ChatBox` gained an `onReset` prop and **lost `disabled={isLoading}` on Clear conversation** — clearing mid-stream is now allowed, which is the whole point of aborting in `reset`. |
+| 2026-07-31 | 5 | **The backend source is readable after all** — `Read` and `grep` work on `~/Developer/solar-agent-backend` even though the sandbox refuses to `ls` it. That is how §D's intent and journey-stage enums got written from `app/schemas/intents.py` rather than invented, which matters: `IntentBadge` covers all 21 intents and 5 stages exactly. Worth remembering for the remaining phases — the widget payload shapes Phase 7 needs are probably in `app/schemas/` too, and reading them beats guessing from the tool names. |
+| 2026-07-31 | 5 | **`rehype-raw` is an XSS decision, not just a rendering one**, and the plan's locked-decisions table does not say so. Turning it on switches off react-markdown's blanket refusal to render HTML, and reply text is model output from an agent whose toolset includes `scrape_website` — a page the model reads can try to talk it into emitting markup. `Markdown.tsx` replaces the protection rather than dropping it: an element allowlist (no `script`/`iframe`/`style`/`form`/`img`), a small local rehype plugin that deletes every `on*` attribute and cuts script-like subtrees out whole, and react-markdown's built-in `urlTransform` for `javascript:` hrefs. Verified by injecting all four vectors at once. **This is not a full sanitiser** — it is an allowlist I wrote, not an audited one. `rehype-sanitize` is the real answer (one dep, ~10 kB, drops in as another rehype plugin) and is worth taking before this goes anywhere near production. Flagged rather than added, since deps are your call. |
+| 2026-07-31 | 5 | Smaller calls. (1) **The customer's own turns are not rendered as markdown** — their line breaks are meaningful and their asterisks are not emphasis. Only assistant content goes through `Markdown`. (2) `Markdown` is **memoised on the source string**, because during streaming it re-parses on every delta and without it each chunk re-parses every earlier reply in the transcript too. (3) All six heading levels render as `h4` — a chat bubble has no document outline, and the plan specifies `h4` semibold. (4) An assistant message with **empty content renders no bubble at all** (a tool-only turn), so Phase 7's widget will stand alone rather than under an empty box. (5) `stripHtml` parses with `DOMParser` rather than regex-stripping, so `&amp;` reaches the clipboard as `&`; it deliberately leaves markdown alone, since markdown is readable as-is and the plan only asked for HTML. |
+| 2026-07-31 | — | Noticed while reading `FRONTEND_INTEGRATION.md` for the intent enums, and **not acted on**: the deployed backend can require an `X-API-Key` header on every `/api` route when `API_KEYS` is set, and `src/lib/api.ts` sends no such header. Local dev is unaffected (`API_KEYS` unset), so nothing is broken today — but a production build against Cloud Run would get a blanket `401`. Belongs with Phase 10's "production build check against the deployed backend URL". The doc is candid that a `PUBLIC_`-prefixed key is readable in devtools and is drive-by-traffic filtering, not authentication. |
 | 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |

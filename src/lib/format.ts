@@ -73,6 +73,24 @@ export function humanizeToolName(name: string): string {
     .join(' ');
 }
 
+/**
+ * Flatten a message's rendered markup back to plain text, for the clipboard.
+ *
+ * Parsing rather than regex-stripping, so entities come back as characters
+ * (`&amp;` → `&`) instead of travelling into the clipboard as source. Block
+ * boundaries are turned into newlines first: `textContent` alone would run
+ * `<p>a</p><p>b</p>` together as `ab`.
+ *
+ * `DOMParser` builds an inert document — nothing in the markup loads or runs.
+ */
+export function stripHtml(html: string): string {
+  const withBreaks = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6]|tr|blockquote)>/gi, '\n');
+  const text = new DOMParser().parseFromString(withBreaks, 'text/html').body.textContent;
+  return (text ?? '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /** A message timestamp as a short local wall-clock time, e.g. `4:07 pm`. */
 export function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString('en-IN', {
