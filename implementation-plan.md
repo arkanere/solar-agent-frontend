@@ -24,7 +24,7 @@ can resume from the checklist without re-reading the Svelte codebase.
 
 - [x] **Phase 0** — Scaffold: Vite + React + TS + Tailwind v4 + shadcn/ui
 - [x] **Phase 1** — Types and the NDJSON stream client (pure TS, no React)
-- [ ] **Phase 2** — Zustand store: messages, lead profile, persistence
+- [x] **Phase 2** — Zustand store: messages, lead profile, persistence
 - [ ] **Phase 3** — Static chat UI: list, bubble, composer
 - [ ] **Phase 4** — Wire streaming: send, stop, retry, regenerate
 - [ ] **Phase 5** — Markdown rendering and message metadata
@@ -139,21 +139,36 @@ without checking them, so the runtime pass alone proved nothing.
 **Goal:** all chat state lives in one store with explicit actions. Components will only
 read from it.
 
-- [ ] `src/store/chatStore.ts`
-- [ ] State: `messages`, `leadProfile`, `isLoading`, `isStreaming`, `voiceOutputEnabled`
-- [ ] Actions: `appendMessage`, `patchLastMessage`, `removeMessageAt`,
-      `truncateFrom`, `setLeadProfile`, `applyContextUpdates`, `reset`, `greet`
-- [ ] `applyContextUpdates` maps backend camelCase keys → profile fields via
+- [x] `src/store/chatStore.ts`
+- [x] State: `messages`, `leadProfile`, `isLoading`, `isStreaming`, `voiceOutputEnabled`
+- [x] Actions: `appendMessage`, `patchLastMessage`, `removeMessageAt`,
+      `truncateFrom`, `setLeadProfile`, `applyContextUpdates`, `reset`, `greet`.
+      *Plus `setLoading`, `setStreaming`, `setVoiceOutputEnabled` — the state above is
+      listed without setters and is unusable from Phase 4/6 without them.*
+- [x] `applyContextUpdates` maps backend camelCase keys → profile fields via
       `CONTEXT_TO_PROFILE` (§D). Unmapped keys warn in dev and are dropped.
       `false` is meaningful for `hasDocuments` — skip only `null` and `""`.
-- [ ] Persist to localStorage under the **same keys as the Svelte app** so a session can
+      *`undefined` is skipped too.*
+- [x] Persist to localStorage under the **same keys as the Svelte app** so a session can
       be carried across: `chatMessages`, `leadProfile`, `chatVoiceOutput`.
       Use Zustand `persist` middleware with a `partialize` that excludes transient flags
-      (`isLoading`, `isStreaming`).
-- [ ] Seed the welcome message when there is no stored transcript (§D)
+      (`isLoading`, `isStreaming`). *Needed a custom `PersistStorage` — see Session log.*
+- [x] Seed the welcome message when there is no stored transcript (§D)
 
 **Done when:** store actions can be driven from a scratch test — append a message,
 patch it, reset — and the localStorage keys round-trip.
+
+**Verified 2026-07-31.** Scratch script, 50 assertions, all passing, over a fresh module
+import per scenario so `persist` re-hydrates each time: cold start seeds the greeting and
+writes all three keys; a stored transcript suppresses the greeting; a stored profile is
+spread over `EMPTY_LEAD_PROFILE` so a field added later still comes back complete;
+append/patch/remove/truncate including patch-on-empty as a no-op and a merge that leaves
+untouched fields alone; `applyContextUpdates` remapping, `hasDocuments: false` kept,
+`null`/`""` skipped without blanking an earlier value, unmapped key dropped; only the
+three Svelte keys ever appear in storage and no transient flag reaches them; `reset`
+clears the profile and flags but keeps `voiceOutputEnabled`, which is a user preference,
+not conversation state; a corrupt `chatMessages` entry falls back to the greeting instead
+of throwing at boot. `tsc -b`, `npm run lint` and `prettier --check` clean.
 
 ---
 
@@ -567,4 +582,7 @@ happen.
 | 2026-07-29 | 1 | `api.ts` now reads `import.meta.env?.VITE_API_BASE_URL` (optional chaining). Vite injects `import.meta.env`, so the module threw at import time under plain Node, which blocked scratch verification. Vitest does provide it, so this is not needed for Phase 9 — it just keeps the module importable outside a bundle. |
 | 2026-07-29 | — | **Published to <https://github.com/arkanere/solar-agent-frontend> (public).** `origin` now exists, branch was already `main`, so commit straight to `main` and push as CLAUDE.md says. Before the first push the history was rewritten with `git filter-repo` to strip the home-directory path from all three commits — **every commit SHA changed**, so any other clone of this repo is on orphaned history and must be re-cloned, not pulled. See §A: keep paths `~`-relative from here on. Cloud Run URL and the CORS notes were kept on purpose; they are useful to anyone running this locally and the URL is already public in the deployed frontend. |
 | 2026-07-29 | — | The repo has **no README** — the public landing page is bare. That is not an oversight: the plan schedules it for Phase 10. Worth pulling forward if the repo is going to be shared before then. |
+| 2026-07-31 | 2 | Store done and verified. One conflict inside the phase spec itself: `persist` writes **one** key holding a `{ state, version }` envelope, but the phase also requires the Svelte app's **three bare keys** with `chatVoiceOutput` as `"1"`/`"0"`. Kept the middleware and gave it a custom `PersistStorage` (`chatStorage`) that fans out to the three keys on write and reassembles the slice on read — carrying a live session between the two implementations only works if the on-disk format matches exactly. It is typed against the partialized slice, so a new persisted field has to be added to `partialize` **and** to both halves of the adapter. |
+| 2026-07-31 | 2 | Three judgement calls in the store, all flagged rather than assumed. (1) **`reset()` does not clear `voiceOutputEnabled`** — it is a persisted *mode* the user chose, not conversation state, and Phase 6 states as much. (2) **`setLeadProfile` merges a `Partial`** rather than replacing wholesale; every caller (context updates, lead-form prefill) knows a few fields, none knows all twenty. (3) `applyContextUpdates` writes through `patch[field] = value as never` — the map's value type is `keyof LeadProfile`, so TS cannot tie a key to its own field type. It means a wrongly-typed server value (`hasDocuments: "yes"`) would be stored as-is; if that ever bites, the fix is per-field coercion, not a bigger cast. |
+| 2026-07-31 | 2 | Scratch verification could not run from the scratchpad: the store imports `@/lib/types`, and resolving that alias needs the repo's `tsconfig.json`, so the script ran from the repo root as a `.mts` (`type: module` is set there; a `.ts` in the scratchpad transpiles as CJS and rejects top-level `await`) and was deleted afterwards. Node 24 has no `localStorage` without `--experimental-webstorage`, so the script defines one over a `Map`. Phase 9 gets this for free from jsdom. |
 | 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |
