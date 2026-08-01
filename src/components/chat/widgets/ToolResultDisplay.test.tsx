@@ -145,13 +145,11 @@ describe('LeadFormCard', () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ success: true, id: 'MOCK-0007' }), {
-            status: 200,
-          }),
-        ),
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ success: true, id: 'MOCK-0007' }), {
+          status: 200,
+        }),
+      ),
     );
 
     renderForm({

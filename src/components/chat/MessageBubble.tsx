@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { IntentBadge } from '@/components/chat/IntentBadge';
 import { Markdown } from '@/components/chat/Markdown';
 import { TokenUsage } from '@/components/chat/TokenUsage';
+import { WidgetErrorBoundary } from '@/components/chat/WidgetErrorBoundary';
 import { ToolResultDisplay } from '@/components/chat/widgets/ToolResultDisplay';
 import { formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -112,7 +113,9 @@ export function MessageBubble({
         )}
 
         {message.toolExecuted && (
-          <ToolResultDisplay name={message.toolExecuted} result={message.toolResult} />
+          <WidgetErrorBoundary toolName={message.toolExecuted}>
+            <ToolResultDisplay name={message.toolExecuted} result={message.toolResult} />
+          </WidgetErrorBoundary>
         )}
 
         {(message.intent || message.usage) && (

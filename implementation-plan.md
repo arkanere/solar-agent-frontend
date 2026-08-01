@@ -32,7 +32,7 @@ can resume from the checklist without re-reading the Svelte codebase.
 - [x] **Phase 7** — Tool-result widgets (13 components)
 - [x] **Phase 8** — App shell: full-page chat + popup dialog
 - [x] **Phase 9** — Tests: Vitest + React Testing Library
-- [ ] **Phase 10** — Polish: accessibility, error states, README
+- [x] **Phase 10** — Polish: accessibility, error states, README
 
 ---
 
@@ -484,14 +484,41 @@ refusal to confirm a submission the server rejected.
 
 ## Phase 10 — Polish
 
-- [ ] Keyboard navigation and focus order through the whole widget
-- [ ] Screen-reader pass on the live region — verify streaming updates announce sanely
-- [ ] Dark mode verified across every widget
-- [ ] Cold-start handling: **no client-side timeout under ~30s.** Cloud Run runs
+- [x] Keyboard navigation and focus order through the whole widget
+- [x] Screen-reader pass on the live region — ~~verify streaming updates announce
+      sanely~~ **structure checked, not heard.** See below.
+- [x] Dark mode verified across every widget *(Phase 7's run)*
+- [x] Cold-start handling: **no client-side timeout under ~30s.** Cloud Run runs
       `min-instances: 0`, so the first request after a quiet period is slow.
-- [ ] Error boundary around the widget list so one bad tool payload can't blank the chat
-- [ ] `README.md`: setup, running the backend locally, env vars, the CORS caveat
-- [ ] Production build check against the deployed backend URL
+      *No timeout is set anywhere — the browser's own is the only limit.*
+- [x] Error boundary around the widget list so one bad tool payload can't blank the chat
+      *— `WidgetErrorBoundary`, per message rather than around the list, so one bad
+      payload costs its own widget and nothing else.*
+- [x] `README.md`: setup, running the backend locally, env vars, the CORS caveat
+- [ ] **Production build check against the deployed backend URL — not done.** It cannot
+      be done from here: the deployed `CORS_ALLOW_ORIGINS` excludes `localhost`, so the
+      check needs a deployed frontend, and it would also spend real model calls. The
+      `X-API-Key` gap noted in the Phase 5 log belongs to this check.
+- [x] Theme toggle, settled from Open questions: a real one. `useTheme` follows the
+      system preference until the customer chooses, then remembers the choice under the
+      Svelte app's `theme` key.
+
+**Verified 2026-08-01** in the browser against `npm run dev`, plus `npm test` (14 files,
+178 tests). Tab order runs in document order and every one of the 13 focusable controls
+has an accessible name; the hover-only per-message actions are revealed by focus as well
+as hover (`:focus-within` matches and the row goes to full opacity — measurable only with
+the transition removed, since a hidden tab does not advance transitions either). The theme
+toggle labels itself by what it will do, persists to `theme`, and survives a reload;
+with nothing stored it follows the system and keeps following it live. The error boundary
+has its own tests: a throwing widget is replaced by one line of apology while the reply
+above it and the rest of the transcript stay put.
+
+**What the live-region item does and does not claim.** The history is
+`role="log" aria-live="polite" aria-atomic="false"`, and `aria-busy` tracks `isLoading`,
+so a reply is marked busy for the whole time it is streaming and clears when the turn
+ends — which is the pattern that stops a screen reader reading every token as it lands.
+That is the structure being right. **No actual screen reader was run**, so "announces
+sanely" is reasoned, not observed.
 
 ---
 
@@ -726,10 +753,17 @@ happen.
 
 ## Open questions
 
-- Theme toggle: the Svelte app has `themeStore.svelte.ts` and `mode-watcher`. Deferred to
-  Phase 10 — decide then whether to port a full toggle or hardcode light mode.
+- ~~Theme toggle~~ **Settled in Phase 10.** `useTheme` follows `prefers-color-scheme`
+  until the customer picks, then remembers the pick under the Svelte app's `theme` key.
+  `mode-watcher` was not ported — it is a Svelte library, and the behaviour is 40 lines.
 - `workflow` events are documented but not handled by the Svelte client. Left unhandled
   here too, pending a reason to render them.
+- **Does the Svelte popup open itself after a delay?** `isManuallyDismissed` suggests it
+  might, and the Svelte source is not on this machine. The dismissal flag is recorded but
+  nothing acts on it. Worth checking against the deployed site.
+- **`X-API-Key`.** The deployed backend can require it and this client never sends one, so
+  a production build against a key-protected deployment gets a blanket `401`. Untouched
+  because local dev is unaffected; it belongs with the outstanding production check.
 
 ## Session log
 
@@ -767,4 +801,7 @@ happen.
 | 2026-08-01 | 8 | A verification trap worth knowing for the rest of this port: **Chrome does not advance CSS animations in a hidden tab**, and the automated tab is always hidden. Radix keeps a closing dialog mounted until its exit animation ends, so the popup appeared to leave a `[role="dialog"]` node behind with `data-scroll-locked` stuck on `<body>` — which reads exactly like a real scroll-lock leak. It is not: disabling the exit animation made teardown complete immediately, on both a fresh cycle and the already-stuck node. Assert on `data-state="open"` rather than on the node's existence, and do not trust animation-gated cleanup in this environment. |
 | 2026-08-01 | 9 | Tests done: 172 across 12 files. Config went in `vite.config.ts` rather than a separate `vitest.config.ts` so the `@` alias and the dev middleware are not duplicated. Two harness details that cost time and will cost it again: (1) **a mocked `fetch` must error its body stream on abort**, the way the real one does — otherwise the hook's read loop sits on a stream nothing ends and Stop looks like a hang, when it is the mock that is wrong; (2) `userEvent.setup()` **installs its own `navigator.clipboard`**, so a clipboard spy has to be defined *after* it, and via `defineProperty` because jsdom's is getter-only. |
 | 2026-08-01 | 9 | The store tests import the module fresh per scenario (`vi.resetModules()` then `await import`), because `persist` rehydrates once at import time — anything about what was already in localStorage is untestable otherwise. One real fix came out of writing these: `stripMarkdown` left a whitespace-only line behind where it had removed a fenced code block, which TTS reads as a pause; it now clears those lines. Everything else passed as written. |
+| 2026-08-01 | 10 | Polish done, with **one item deliberately left open: the production build check against the deployed backend.** It is not skippable work I quietly dropped — it is unrunnable from here (deployed CORS excludes `localhost`, so it needs a deployed frontend) and it would spend real model calls. The `X-API-Key` gap is part of the same check. Everything else in the phase is done and verified. |
+| 2026-08-01 | 10 | The error boundary went **per message rather than around the whole list**, which the phase's wording ("around the widget list") allows either way. Per message means a bad `generate_quotation` payload costs that one widget and leaves every other widget, and the reply text above it, on screen — the failure is contained to the thing that failed. It logs the tool name, so a report of "the quotation looked broken" is traceable without a repro. |
+| 2026-08-01 | 10 | Two honest limits on the accessibility pass, both worth knowing before anyone claims this is accessible. (1) **No screen reader was run.** The live region has the right shape — `role="log"`, polite, non-atomic, `aria-busy` for the whole streaming turn — and that structure is what keeps a reply from being read token by token, but nobody heard it. (2) **Focus restoration after the popup closes was never observed** (Phase 8's log explains why: the automated tab is never focused). Radix does it; this port did not verify it. Both are cheap to check by hand in a real browser and should be, before this ships. |
 | 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |

@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatBox } from '@/components/chat/ChatBox';
 import { ChatbotPopup } from '@/components/chat/ChatbotPopup';
 import { useChat } from '@/hooks/useChat';
+import { useTheme } from '@/hooks/useTheme';
 
 /**
  * Demo host page: the chat in both of the shapes it ships in.
@@ -14,17 +14,9 @@ import { useChat } from '@/hooks/useChat';
  * which both read directly.
  */
 export default function App() {
-  // Theming keys off a `.dark` class on <html>, matching the Svelte app. A full
-  // toggle with persistence and system-preference following lands in Phase 10.
-  const [dark, setDark] = useState(false);
+  const { theme, toggle: toggleTheme } = useTheme();
   const chat = useChat();
-
-  const toggleTheme = () => {
-    setDark((current) => {
-      document.documentElement.classList.toggle('dark', !current);
-      return !current;
-    });
-  };
+  const dark = theme === 'dark';
 
   const handlers = {
     onSend: chat.send,
@@ -39,9 +31,14 @@ export default function App() {
     <main className="flex min-h-screen flex-col items-center gap-4 bg-background p-4 text-foreground sm:p-8">
       <div className="flex w-full max-w-4xl items-center justify-between">
         <h1 className="text-lg font-semibold">Solar Vipani</h1>
-        <Button variant="ghost" size="icon" onClick={toggleTheme} aria-pressed={dark}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleTheme}
+          aria-pressed={dark}
+          aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
           {dark ? <Sun /> : <Moon />}
-          <span className="sr-only">Toggle theme</span>
         </Button>
       </div>
 
