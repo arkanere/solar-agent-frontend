@@ -47,6 +47,9 @@ export function stripMarkdown(input: string): string {
       .replace(/^\s*\|?[\s:|-]{4,}\|?\s*$/gm, ' ')
       .replace(/\|/g, ' ')
       .replace(/[ \t]{2,}/g, ' ')
+      // Removing a block leaves the whitespace that stood in for it behind, and
+      // a line of nothing but a space still reads as a pause.
+      .replace(/^[ \t]+$/gm, '')
       .replace(/\n{3,}/g, '\n\n')
       .trim()
   );

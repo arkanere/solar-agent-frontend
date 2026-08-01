@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -43,6 +44,14 @@ function mockLeadEndpoint(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), mockLeadEndpoint()],
+  // jsdom, because everything under test touches the DOM somewhere: the store
+  // persists to localStorage, the widgets render, and `stripHtml` parses markup.
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    css: false,
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

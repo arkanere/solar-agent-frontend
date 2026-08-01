@@ -31,7 +31,7 @@ can resume from the checklist without re-reading the Svelte codebase.
 - [x] **Phase 6** — Voice: recorder and speech playback
 - [x] **Phase 7** — Tool-result widgets (13 components)
 - [x] **Phase 8** — App shell: full-page chat + popup dialog
-- [ ] **Phase 9** — Tests: Vitest + React Testing Library
+- [x] **Phase 9** — Tests: Vitest + React Testing Library
 - [ ] **Phase 10** — Polish: accessibility, error states, README
 
 ---
@@ -447,23 +447,38 @@ responsive pass.
 
 ## Phase 9 — Tests
 
-- [ ] Install `vitest @testing-library/react @testing-library/user-event jsdom`
-- [ ] `stream.test.ts` — chunk boundaries mid-object, malformed lines, unknown event
+- [x] Install `vitest @testing-library/react @testing-library/user-event jsdom`
+      *plus `@testing-library/jest-dom` for the matchers. Config lives in
+      `vite.config.ts`, setup in `src/test/setup.ts`; `npm test` runs once,
+      `npm run test:watch` watches.*
+- [x] `stream.test.ts` — chunk boundaries mid-object, malformed lines, unknown event
       types, missing trailing newline. Phase 1's scratch scripts already cover these
       plus: splits one byte either side of a `\n`, byte-at-a-time chunking, blank and
       whitespace-only lines, nothing delivered after `done`, a multi-byte character
       (`₹`) split across chunks, and an empty stream. **Port all of them.**
-- [ ] `chatClient.test.ts` — request shape, history capped to the *last* 8 turns in
+- [x] `chatClient.test.ts` — request shape, history capped to the *last* 8 turns in
       order, failed turns excluded by `toHistory`, non-OK response throws
-- [ ] `chatStore.test.ts` — `applyContextUpdates` mapping including the `hasDocuments:
+- [x] `chatStore.test.ts` — `applyContextUpdates` mapping including the `hasDocuments:
       false` case, patch/truncate actions, persistence round-trip
-- [ ] `useChat.test.ts` — mocked `ReadableStream`: happy path, pre-delta event buffering,
+- [x] `useChat.test.ts` — mocked `ReadableStream`: happy path, pre-delta event buffering,
       abort mid-stream, error event
-- [ ] `validation.test.ts` — every branch of `validateLeadForm`
-- [ ] Component tests (RTL, query by role): composer Enter vs Shift+Enter, starter chips
+- [x] `validation.test.ts` — every branch of `validateLeadForm`
+- [x] Component tests (RTL, query by role): composer Enter vs Shift+Enter, starter chips
       disappearing after the first user message, retry on a failed message
+- [x] Beyond the list: `format.test.ts` (formatters, `stripHtml`, `safeStringify`),
+      `Markdown.test.tsx` (the injection vectors Phase 5 hardened against),
+      `ToolResultDisplay.test.tsx` (dispatch, both silent tools, the CAD clamp, and
+      the lead form's success *and* failure), `useAudioRecorder.test.ts` and
+      `useSpeechPlayer.test.ts` (`stripMarkdown`).
 
 **Done when:** `npm test` passes and covers the stream parser and store exhaustively.
+
+**Verified 2026-08-01. `npm test`: 12 files, 172 tests, all passing**, alongside
+`tsc -b`, `npm run lint`, `prettier --check` and `npm run build`. Every Phase 1 and
+Phase 2 scratch assertion is now a real test, and the suites reach further: the hook's
+buffering, abort, error and retry/regenerate/reset paths; the recorder's stream release
+on all four exits; the markdown sanitiser's four injection vectors; the lead form's
+refusal to confirm a submission the server rejected.
 
 ---
 
@@ -750,4 +765,6 @@ happen.
 | 2026-08-01 | 8 | App shell done. **`ChatbotPopup` takes the chat handlers as props instead of calling `useChat`.** The demo page shows the chat twice, and a second `useChat` would mean a second `AbortController` and a second speech player: Stop in the popup would not reach a turn started on the page, and a reply could be read aloud twice over itself. The store was always shared (it is a module singleton); this makes the *hook* shared too, which is the part that actually holds the request. |
 | 2026-08-01 | 8 | **`isManuallyDismissed` could not be ported faithfully** — the Svelte original is not on this machine (see the Phase 3 entry), so what it gated is unknown. Most likely it suppressed an automatic open. Nothing here opens the popup on its own, so the flag is recorded on a manual close and nothing reads it yet; if auto-open is wanted, the rule to honour is already in place. **Worth confirming against the deployed site** whether the Svelte popup opens itself after a delay. |
 | 2026-08-01 | 8 | A verification trap worth knowing for the rest of this port: **Chrome does not advance CSS animations in a hidden tab**, and the automated tab is always hidden. Radix keeps a closing dialog mounted until its exit animation ends, so the popup appeared to leave a `[role="dialog"]` node behind with `data-scroll-locked` stuck on `<body>` — which reads exactly like a real scroll-lock leak. It is not: disabling the exit animation made teardown complete immediately, on both a fresh cycle and the already-stuck node. Assert on `data-state="open"` rather than on the node's existence, and do not trust animation-gated cleanup in this environment. |
+| 2026-08-01 | 9 | Tests done: 172 across 12 files. Config went in `vite.config.ts` rather than a separate `vitest.config.ts` so the `@` alias and the dev middleware are not duplicated. Two harness details that cost time and will cost it again: (1) **a mocked `fetch` must error its body stream on abort**, the way the real one does — otherwise the hook's read loop sits on a stream nothing ends and Stop looks like a hang, when it is the mock that is wrong; (2) `userEvent.setup()` **installs its own `navigator.clipboard`**, so a clipboard spy has to be defined *after* it, and via `defineProperty` because jsdom's is getter-only. |
+| 2026-08-01 | 9 | The store tests import the module fresh per scenario (`vi.resetModules()` then `await import`), because `persist` rehydrates once at import time — anything about what was already in localStorage is untestable otherwise. One real fix came out of writing these: `stripMarkdown` left a whitespace-only line behind where it had removed a fenced code block, which TTS reads as a pause; it now clears those lines. Everything else passed as written. |
 | 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |
