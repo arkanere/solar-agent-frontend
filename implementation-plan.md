@@ -29,7 +29,7 @@ can resume from the checklist without re-reading the Svelte codebase.
 - [ ] **Phase 4** — Wire streaming: send, stop, retry, regenerate
 - [x] **Phase 5** — Markdown rendering and message metadata
 - [x] **Phase 6** — Voice: recorder and speech playback
-- [ ] **Phase 7** — Tool-result widgets (13 components)
+- [x] **Phase 7** — Tool-result widgets (13 components)
 - [ ] **Phase 8** — App shell: full-page chat + popup dialog
 - [ ] **Phase 9** — Tests: Vitest + React Testing Library
 - [ ] **Phase 10** — Polish: accessibility, error states, README
@@ -361,27 +361,53 @@ the one deliberate failure. `tsc -b`, `npm run lint`, `prettier --check` and
 
 **Goal:** 13 components, mostly presentational. Composition and prop typing.
 
-- [ ] `WidgetShell.tsx` — bordered panel, emoji + title + subtitle, optional
+- [x] `WidgetShell.tsx` — bordered panel, emoji + title + subtitle, optional
       `actions` slot (Svelte snippet → React `ReactNode` prop)
-- [ ] `StatTile.tsx`, `StatRow.tsx`
-- [ ] `ToolResultDisplay.tsx` — dispatch map (§D). Render nothing for
+- [x] `StatTile.tsx`, `StatRow.tsx`
+- [x] `ToolResultDisplay.tsx` — dispatch map (§D). Render nothing for
       `collect_customer_info` and `scrape_website` — they run for the model's benefit.
-- [ ] `QuotationDisplay.tsx`
-- [ ] `RoiDisplay.tsx` — first 5 of 25 yearly milestones; environmental impact block
-- [ ] `BookingDisplay.tsx`
-- [ ] `SystemSizeDisplay.tsx`
-- [ ] `SubsidyDisplay.tsx`
-- [ ] `CadDrawingDisplay.tsx` — utilisation progress bar clamped 0–100;
+- [x] `QuotationDisplay.tsx`
+- [x] `RoiDisplay.tsx` — first 5 of 25 yearly milestones; environmental impact block
+- [x] `BookingDisplay.tsx`
+- [x] `SystemSizeDisplay.tsx`
+- [x] `SubsidyDisplay.tsx`
+- [x] `CadDrawingDisplay.tsx` — utilisation progress bar clamped 0–100;
       SVG offered as a **download only**, never injected into the page
-- [ ] `KnowledgeBaseDisplay.tsx` — content is plain text, render as text not HTML
-- [ ] `GenericToolDisplay.tsx` — fallback; guard `JSON.stringify` against circular payloads
-- [ ] `LeadFormCard.tsx` — prefill from tool result, validation, submit, success state
-- [ ] `src/lib/validation.ts` — port `validateLeadForm` (§D for the regexes)
-- [ ] **Mock lead submission** (§E): MSW handler or Vite middleware for
-      `POST /api/submit-lead` returning `{ success: true, id: "MOCK-<n>" }`
+- [x] `KnowledgeBaseDisplay.tsx` — content is plain text, render as text not HTML
+- [x] `GenericToolDisplay.tsx` — fallback; guard `JSON.stringify` against circular payloads
+- [x] `LeadFormCard.tsx` — prefill from tool result, validation, submit, success state
+- [x] `src/lib/validation.ts` — port `validateLeadForm` (§D for the regexes)
+- [x] **Mock lead submission** (§E): ~~MSW handler or~~ Vite middleware for
+      `POST /api/submit-lead` returning `{ success: true, id: "MOCK-<n>" }`.
+      *Middleware, in `vite.config.ts` — zero new dependencies, and `apply: 'serve'`
+      makes it structurally impossible to ship.*
+- [x] Wire `ToolResultDisplay` into `MessageBubble`, under the prose and above the
+      intent/usage row.
 
 **Done when:** each widget renders correctly from a fixture payload, and the lead form
 validates, submits to the mock, and shows the confirmation state with a reference ID.
+
+**Verified 2026-08-01** in the browser against `npm run dev` with a 20-message fixture in
+`localStorage`, one turn per tool, every payload copied from the shapes
+`app/services/tool_executor.py` actually returns. All nine widgets render; the two silent
+tools render their prose and **no** panel, so exactly nine `<section>`s exist for eleven
+tool turns. Quotation shows pricing, system, breakdown and savings; ROI shows exactly five
+yearly milestones out of the seven sent, plus the CO₂ block; subsidies list all three
+schemes with the computed total on the central one; the system-size widget shows the
+coverage basis and the "enough space" line the roof area enables. The CAD payload's
+deliberately impossible **118.4% clamped to 100%** on both the bar width and
+`aria-valuenow`, and the drawing is nowhere in the DOM — no `img`, `object`, `embed`,
+`iframe`, no payload `rect`, no `data:image/svg+xml` anywhere in the markup; the SVG
+button was checked by intercepting the anchor click, which would have downloaded
+`CAD-1785559000000.svg` from a blob URL. Lead form: prefill resolves tool-over-profile as
+intended (name/phone/type from the tool, email/PIN from the profile, comment blank); a bad
+phone, short PIN, malformed email and empty comment produce four errors and no submission;
+fixing them clears the errors, `98765 43210` is accepted with its space, and the mock
+answers `MOCK-0001` into the confirmation. A 500 from the endpoint shows the failure and
+**no confirmation** — the one outcome that must never be faked. `safeStringify` (in `src/lib/json.ts`, moved out of the widget so the file exports
+only a component) was exercised against the real module: a cycle becomes `[Circular]`, a BigInt stringifies, a
+nested payload survives. Dark mode checked across the widgets and the form. `tsc -b`,
+`npm run lint`, `prettier --check` and `npm run build` clean; no new console output.
 
 ---
 
@@ -697,4 +723,7 @@ happen.
 | 2026-08-01 | 6 | Voice done. Architecture call worth recording: **both voice hooks are composed inside `useChat`, not inside `Composer`.** The phase reads as a composer feature, but three of its own requirements pull the other way — a completed turn has to start playback (only the streaming loop knows a turn completed cleanly), `reset` has to stop the recorder *and* playback, and starting a recording has to stop playback. Owning them in the composer would mean passing callbacks up into the hook and back down again. So `useChat` exposes one `voice` object (`VoiceApi`) and `Composer` is presentational for all of it; `ChatBox` just forwards the prop, and a host that omits it gets a text-only composer with no dead buttons. |
 | 2026-08-01 | 6 | Judgement calls in the voice hooks. (1) **Speaking is keyed off the turn ending in the `try` block**, not off a message flag — a stopped or failed turn leaves through `catch`, so it is structurally impossible for either to be read aloud, rather than depending on a check someone could later remove. (2) **The speaker toggle does not speak the reply already on screen.** It is a mode ("read replies to me from now on"), matching how it is persisted; speaking the last reply on toggle would also fire on a page the customer had scrolled away from. (3) `stripMarkdown` drops link *targets* and keeps link text, and drops fenced code entirely — a read-aloud URL is unusable and a JSON payload read aloud is worse than silence. (4) The recorder's `stop()` resolves from the `MediaRecorder`'s own `stop` event rather than after a timeout, so the last chunk is always in the blob. (5) A denied microphone stays disabled for the rest of the session: `permission` is re-synced on mount only. Granting it in browser settings needs a reload in practice anyway, and polling the Permissions API for a state that rarely changes is not worth it. |
 | 2026-08-01 | 6 | Two things to know for later phases. (1) **`stripMarkdown` is a regex pass, not a parser**, so pathological markdown can leak a stray marker into the spoken text. That is a cosmetic failure in audio, not a security one — unlike `Markdown.tsx`, nothing here renders. (2) The `useSpeechPlayer` request-ID guard has a subtlety Phase 9 should test directly: a *superseded* clip's own `ended`/`error` handlers are guarded too, and the stale-response paths tear down only their own audio element rather than calling the shared `release()`. Without that, a late response from an abandoned request cleans up the clip that replaced it — the bug this shape exists to prevent. |
+| 2026-08-01 | 7 | Widgets done. **The payload shapes were read out of the backend, not guessed** — `app/services/tool_executor.py` builds every one of them literally, so each widget's payload interface is a transcription of the dict its tool returns, and the fixture used for verification is the same. Two things that only reading it would tell you: the tool `result` on the wire is the handler's `data` field alone (the `success`/`message`/`error` envelope is consumed server-side), and its keys are **snake_case** — the server camelCases its own events but passes tool data through verbatim. Also settled Phase 3's open question: `format.ts` was written blind, and `formatCurrency`/`formatNumber` read correctly against real figures here. `formatLakh`/`formatThousand`/`humanizeToolName` are still unused — no widget wanted a compact form, and the tool badge became the generic widget's title instead. |
+| 2026-08-01 | 7 | Judgement calls. (1) **Widgets sit outside the message bubble, not inside it.** A quotation inside a 46-character bubble is unreadable, so `ToolResultDisplay` renders as a sibling under the prose. A tool-only turn already dropped its empty bubble in Phase 5, so the widget stands alone exactly as that comment promised. (2) **Each widget declares its own payload interface and the dispatcher casts.** Nothing validates these on the way in and a runtime validator is a dependency and a maintenance burden for a payload we do not control; instead every field is optional and every formatter answers an em dash, so a missing field is a blank, not a crash. (3) `check_subsidies` sends `subsidy_amount` as **prose** ("₹30,000 per kW (40% subsidy)") and only sometimes a numeric `total_subsidy` — the widget renders the prose as given rather than trying to parse a figure out of it. (4) The CAD utilisation figure arrives as a **string**, and the fixture's 118.4% is not hypothetical: the tool's own layout maths can exceed the roof it was given. |
+| 2026-08-01 | 7 | Two notes on `LeadFormCard`, which is the one widget that can mislead a customer. (1) **The confirmation is shown only on a real `success: true`**, never optimistically — §E is explicit that this widget is the sole path to the leads table and that the confirmation must stay honest, and it is now the only widget with a verified negative test. (2) On success it writes name/phone/email/pincode back into the lead profile, so the agent stops asking for details the customer has just typed. The phone is stored **as typed**, spaces and all; validation strips separators to test the pattern but does not normalise the value, matching how the profile stores everything else the customer said. |
 | 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |

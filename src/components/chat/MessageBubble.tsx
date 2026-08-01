@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { IntentBadge } from '@/components/chat/IntentBadge';
 import { Markdown } from '@/components/chat/Markdown';
 import { TokenUsage } from '@/components/chat/TokenUsage';
+import { ToolResultDisplay } from '@/components/chat/widgets/ToolResultDisplay';
 import { formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { ChatMessage } from '@/lib/types';
@@ -108,6 +109,10 @@ export function MessageBubble({
               </div>
             )}
           </div>
+        )}
+
+        {message.toolExecuted && (
+          <ToolResultDisplay name={message.toolExecuted} result={message.toolResult} />
         )}
 
         {(message.intent || message.usage) && (
