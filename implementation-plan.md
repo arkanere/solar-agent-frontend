@@ -30,7 +30,7 @@ can resume from the checklist without re-reading the Svelte codebase.
 - [x] **Phase 5** — Markdown rendering and message metadata
 - [x] **Phase 6** — Voice: recorder and speech playback
 - [x] **Phase 7** — Tool-result widgets (13 components)
-- [ ] **Phase 8** — App shell: full-page chat + popup dialog
+- [x] **Phase 8** — App shell: full-page chat + popup dialog
 - [ ] **Phase 9** — Tests: Vitest + React Testing Library
 - [ ] **Phase 10** — Polish: accessibility, error states, README
 
@@ -413,14 +413,35 @@ nested payload survives. Dark mode checked across the widgets and the form. `tsc
 
 ## Phase 8 — App shell
 
-- [ ] `src/App.tsx` — demo host page with the chat rendered full-height
-- [ ] `ChatbotPopup.tsx` — shadcn `Dialog` wrapper, launcher button, dismiss handling
+- [x] `src/App.tsx` — demo host page with the chat rendered full-height
+- [x] `ChatbotPopup.tsx` — shadcn `Dialog` wrapper, launcher button, dismiss handling
       that mirrors the Svelte `isManuallyDismissed` behaviour
-- [ ] Both mount points share one store instance
-- [ ] Responsive: mobile full-screen, desktop `max-w-4xl h-[85vh]`
+      *— see the Session log: nothing auto-opens the popup here, so the flag records
+      the dismissal and nothing acts on it yet.*
+- [x] Both mount points share one store instance *— and one `useChat`; the popup takes
+      the handlers as props rather than calling the hook itself.*
+- [x] Responsive: mobile full-screen, desktop `max-w-4xl h-[85vh]`
 
 **Done when:** the launcher opens the chat in a modal with focus trapped, Escape closes
 it, and the transcript survives closing and reopening.
+
+**Verified 2026-08-01** in the browser against `npm run dev`. The launcher opens the
+modal; focus lands inside it; its accessible name is "Solar Vipani Assistant" from the
+visually-hidden title; a turn sent from the page-level chat is already in the popup when
+it opens, survives closing and reopening, and the page-level chat still has it afterwards
+— one store, one hook, two mounts. Escape and the header close button both dismiss it,
+and the body scroll lock is released. On desktop the panel measures **896 px** wide
+(`max-w-4xl`) and 85% of the viewport height, with the rounded corner.
+
+**Two things this run could not establish**, both because the automated tab is never the
+focused, visible tab. (1) **Focus restoration to the launcher** after closing: Chrome
+reports `document.hasFocus() === false` throughout, focus lands on `body`, and Radix's
+restore is a no-op in an unfocused document. Focus *trapping* while open was verified;
+restoration was not. (2) **The mobile full-screen layout**: the window would not actually
+resize (`innerWidth` stayed 1280 through two attempts), so only the `sm:` branch was
+measured. The base classes are the ordinary `h-dvh w-screen max-w-none rounded-none`
+pattern, but they were not seen rendering. Both belong in Phase 10's accessibility and
+responsive pass.
 
 ---
 
@@ -726,4 +747,7 @@ happen.
 | 2026-08-01 | 7 | Widgets done. **The payload shapes were read out of the backend, not guessed** — `app/services/tool_executor.py` builds every one of them literally, so each widget's payload interface is a transcription of the dict its tool returns, and the fixture used for verification is the same. Two things that only reading it would tell you: the tool `result` on the wire is the handler's `data` field alone (the `success`/`message`/`error` envelope is consumed server-side), and its keys are **snake_case** — the server camelCases its own events but passes tool data through verbatim. Also settled Phase 3's open question: `format.ts` was written blind, and `formatCurrency`/`formatNumber` read correctly against real figures here. `formatLakh`/`formatThousand`/`humanizeToolName` are still unused — no widget wanted a compact form, and the tool badge became the generic widget's title instead. |
 | 2026-08-01 | 7 | Judgement calls. (1) **Widgets sit outside the message bubble, not inside it.** A quotation inside a 46-character bubble is unreadable, so `ToolResultDisplay` renders as a sibling under the prose. A tool-only turn already dropped its empty bubble in Phase 5, so the widget stands alone exactly as that comment promised. (2) **Each widget declares its own payload interface and the dispatcher casts.** Nothing validates these on the way in and a runtime validator is a dependency and a maintenance burden for a payload we do not control; instead every field is optional and every formatter answers an em dash, so a missing field is a blank, not a crash. (3) `check_subsidies` sends `subsidy_amount` as **prose** ("₹30,000 per kW (40% subsidy)") and only sometimes a numeric `total_subsidy` — the widget renders the prose as given rather than trying to parse a figure out of it. (4) The CAD utilisation figure arrives as a **string**, and the fixture's 118.4% is not hypothetical: the tool's own layout maths can exceed the roof it was given. |
 | 2026-08-01 | 7 | Two notes on `LeadFormCard`, which is the one widget that can mislead a customer. (1) **The confirmation is shown only on a real `success: true`**, never optimistically — §E is explicit that this widget is the sole path to the leads table and that the confirmation must stay honest, and it is now the only widget with a verified negative test. (2) On success it writes name/phone/email/pincode back into the lead profile, so the agent stops asking for details the customer has just typed. The phone is stored **as typed**, spaces and all; validation strips separators to test the pattern but does not normalise the value, matching how the profile stores everything else the customer said. |
+| 2026-08-01 | 8 | App shell done. **`ChatbotPopup` takes the chat handlers as props instead of calling `useChat`.** The demo page shows the chat twice, and a second `useChat` would mean a second `AbortController` and a second speech player: Stop in the popup would not reach a turn started on the page, and a reply could be read aloud twice over itself. The store was always shared (it is a module singleton); this makes the *hook* shared too, which is the part that actually holds the request. |
+| 2026-08-01 | 8 | **`isManuallyDismissed` could not be ported faithfully** — the Svelte original is not on this machine (see the Phase 3 entry), so what it gated is unknown. Most likely it suppressed an automatic open. Nothing here opens the popup on its own, so the flag is recorded on a manual close and nothing reads it yet; if auto-open is wanted, the rule to honour is already in place. **Worth confirming against the deployed site** whether the Svelte popup opens itself after a delay. |
+| 2026-08-01 | 8 | A verification trap worth knowing for the rest of this port: **Chrome does not advance CSS animations in a hidden tab**, and the automated tab is always hidden. Radix keeps a closing dialog mounted until its exit animation ends, so the popup appeared to leave a `[role="dialog"]` node behind with `data-scroll-locked` stuck on `<body>` — which reads exactly like a real scroll-lock leak. It is not: disabling the exit animation made teardown complete immediately, on both a fresh cycle and the already-stuck node. Assert on `data-state="open"` rather than on the node's existence, and do not trust animation-gated cleanup in this environment. |
 | 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |

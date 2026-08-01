@@ -2,20 +2,37 @@ import { useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatBox } from '@/components/chat/ChatBox';
+import { ChatbotPopup } from '@/components/chat/ChatbotPopup';
 import { useChat } from '@/hooks/useChat';
 
-// Demo host page. Phase 8 adds the popup mount alongside this one.
+/**
+ * Demo host page: the chat in both of the shapes it ships in.
+ *
+ * One `useChat` drives both mounts. The hook holds the in-flight request and the
+ * voice resources, so a second instance would mean Stop in one place not
+ * reaching a turn started in the other. The transcript itself is in the store,
+ * which both read directly.
+ */
 export default function App() {
   // Theming keys off a `.dark` class on <html>, matching the Svelte app. A full
   // toggle with persistence and system-preference following lands in Phase 10.
   const [dark, setDark] = useState(false);
-  const { send, stop, retry, regenerate, reset, voice } = useChat();
+  const chat = useChat();
 
   const toggleTheme = () => {
     setDark((current) => {
       document.documentElement.classList.toggle('dark', !current);
       return !current;
     });
+  };
+
+  const handlers = {
+    onSend: chat.send,
+    onStop: chat.stop,
+    onRetry: chat.retry,
+    onRegenerate: chat.regenerate,
+    onReset: chat.reset,
+    voice: chat.voice,
   };
 
   return (
@@ -29,15 +46,11 @@ export default function App() {
       </div>
 
       <div className="h-[85vh] w-full max-w-4xl overflow-hidden rounded-xl border border-border shadow-sm">
-        <ChatBox
-          onSend={send}
-          onStop={stop}
-          onRetry={retry}
-          onRegenerate={regenerate}
-          onReset={reset}
-          voice={voice}
-        />
+        <ChatBox {...handlers} />
       </div>
+
+      {/* The same conversation in the shape it takes on a marketing page. */}
+      <ChatbotPopup {...handlers} />
     </main>
   );
 }
