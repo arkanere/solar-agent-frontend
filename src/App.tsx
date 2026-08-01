@@ -9,7 +9,7 @@ export default function App() {
   // Theming keys off a `.dark` class on <html>, matching the Svelte app. A full
   // toggle with persistence and system-preference following lands in Phase 10.
   const [dark, setDark] = useState(false);
-  const { send, stop, retry, regenerate, reset } = useChat();
+  const { send, stop, retry, regenerate, reset, voice } = useChat();
 
   const toggleTheme = () => {
     setDark((current) => {
@@ -35,6 +35,7 @@ export default function App() {
           onRetry={retry}
           onRegenerate={regenerate}
           onReset={reset}
+          voice={voice}
         />
       </div>
     </main>

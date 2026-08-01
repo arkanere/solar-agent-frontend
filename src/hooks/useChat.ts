@@ -1,5 +1,8 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { sendChatMessage, toHistory } from '@/lib/chatClient';
+import { transcribeAudio } from '@/lib/speechClient';
+import { useAudioRecorder, type MicPermission } from '@/hooks/useAudioRecorder';
+import { useSpeechPlayer } from '@/hooks/useSpeechPlayer';
 import { useChatStore } from '@/store/chatStore';
 import type { ChatMessage, HistoryTurn } from '@/lib/types';
 
@@ -40,6 +43,11 @@ function historyFor(messages: ChatMessage[], appendUser: boolean): HistoryTurn[]
  */
 export function useChat() {
   const abortRef = useRef<AbortController | null>(null);
+  const recorder = useAudioRecorder();
+  const speech = useSpeechPlayer();
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const { speak, stop: stopSpeech } = speech;
   /**
    * Bumped whenever a turn's output must be thrown away rather than landed —
    * currently only by `reset`. A stop keeps its partial reply, so it does not
@@ -168,14 +176,19 @@ export function useChat() {
 
         // No delta ever arrived but the turn still produced something.
         if (!started && Object.keys(buffered).length > 0) {
-          useChatStore
-            .getState()
-            .appendMessage({
-              role: 'assistant',
-              content: '',
-              timestamp: Date.now(),
-              ...buffered,
-            });
+          useChatStore.getState().appendMessage({
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+            ...buffered,
+          });
+        }
+
+        // Only a turn that ran to completion is read aloud. A stopped or failed
+        // one leaves through the catch below, so neither reaches this line — the
+        // customer should not hear half an answer, or an apology.
+        if (content.trim() && useChatStore.getState().voiceOutputEnabled) {
+          void speak(content);
         }
       } catch (error) {
         if (!isCurrent()) return;
@@ -208,14 +221,17 @@ export function useChat() {
         }
       }
     },
-    [],
+    [speak],
   );
 
   const send = useCallback((text: string) => void runChat(text), [runChat]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
-  }, []);
+    // Stop means stop: if the previous reply is still being read out, that ends
+    // too rather than talking over the customer's next question.
+    stopSpeech();
+  }, [stopSpeech]);
 
   /** Re-ask the question that failed, after dropping the failed reply. */
   const retry = useCallback(
@@ -249,16 +265,107 @@ export function useChat() {
   /**
    * Start over. The in-flight turn is aborted *and* fenced off by the run
    * counter, so a chunk already in the pipe cannot write itself into the fresh
-   * conversation. Phase 6 adds stopping the recorder and any playback here.
+   * conversation. The recorder and any playback go with it — a live microphone
+   * or a voice still reading the old answer would both outlive the conversation
+   * they belong to.
    */
   const reset = useCallback(() => {
     runIdRef.current += 1;
     abortRef.current?.abort();
     abortRef.current = null;
+    recorder.cancel();
+    stopSpeech();
+    setVoiceError(null);
     useChatStore.getState().reset();
-  }, []);
+  }, [recorder, stopSpeech]);
 
-  return { send, stop, retry, regenerate, reset };
+  /**
+   * The microphone button, end to end: record, transcribe, then send the
+   * transcript as an ordinary turn. A spoken question is not a distinct kind of
+   * message once it is text, so nothing downstream of `runChat` knows or cares.
+   */
+  const toggleRecording = useCallback(async () => {
+    if (isTranscribing) return;
+
+    if (recorder.isRecording) {
+      const blob = await recorder.stop();
+      if (!blob || blob.size === 0) return;
+
+      setIsTranscribing(true);
+      try {
+        const text = (await transcribeAudio(blob)).trim();
+        if (text) void runChat(text);
+        else setVoiceError("That didn't pick up any speech. Try again?");
+      } catch (error) {
+        console.error('[useChat] transcription failed', error);
+        setVoiceError(
+          error instanceof Error && error.message.includes('25MB')
+            ? error.message
+            : 'Could not transcribe that recording. Please try again.',
+        );
+      } finally {
+        setIsTranscribing(false);
+      }
+      return;
+    }
+
+    // Recording while a reply plays would put the assistant's own voice into
+    // the transcript of the customer's next question.
+    stopSpeech();
+    setVoiceError(null);
+    await recorder.start();
+  }, [isTranscribing, recorder, runChat, stopSpeech]);
+
+  const cancelRecording = useCallback(() => {
+    recorder.cancel();
+    setVoiceError(null);
+  }, [recorder]);
+
+  /**
+   * Voice output is a persisted mode rather than a per-message action: switching
+   * it on means "read replies to me from now on", so it does not speak the reply
+   * already on screen. Switching it off cuts anything mid-sentence short.
+   */
+  const toggleVoiceOutput = useCallback(() => {
+    const { voiceOutputEnabled, setVoiceOutputEnabled } = useChatStore.getState();
+    if (voiceOutputEnabled) stopSpeech();
+    setVoiceOutputEnabled(!voiceOutputEnabled);
+  }, [stopSpeech]);
+
+  const voice: VoiceApi = {
+    isSupported: recorder.isSupported,
+    isRecording: recorder.isRecording,
+    permission: recorder.permission,
+    isTranscribing,
+    isSpeaking: speech.isSpeaking,
+    isSynthesising: speech.isLoading,
+    error: voiceError ?? recorder.error ?? speech.error,
+    toggleRecording,
+    cancelRecording,
+    toggleVoiceOutput,
+    syncPermission: recorder.syncPermission,
+  };
+
+  return { send, stop, retry, regenerate, reset, voice };
+}
+
+/** Everything the composer needs to draw and drive the two voice affordances. */
+export interface VoiceApi {
+  isSupported: boolean;
+  isRecording: boolean;
+  permission: MicPermission;
+  /** The recording is being turned into text. */
+  isTranscribing: boolean;
+  /** A reply is audible right now. */
+  isSpeaking: boolean;
+  /** A reply is being synthesised — the toggle is on but nothing is audible yet. */
+  isSynthesising: boolean;
+  /** The most recent voice failure, already phrased for display. */
+  error: string | null;
+  toggleRecording: () => void | Promise<void>;
+  cancelRecording: () => void;
+  toggleVoiceOutput: () => void;
+  syncPermission: () => Promise<void>;
 }
 
 /** The customer's question that a reply at `index` was answering. */

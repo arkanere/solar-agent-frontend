@@ -28,7 +28,7 @@ can resume from the checklist without re-reading the Svelte codebase.
 - [x] **Phase 3** — Static chat UI: list, bubble, composer
 - [ ] **Phase 4** — Wire streaming: send, stop, retry, regenerate
 - [x] **Phase 5** — Markdown rendering and message metadata
-- [ ] **Phase 6** — Voice: recorder and speech playback
+- [x] **Phase 6** — Voice: recorder and speech playback
 - [ ] **Phase 7** — Tool-result widgets (13 components)
 - [ ] **Phase 8** — App shell: full-page chat + popup dialog
 - [ ] **Phase 9** — Tests: Vitest + React Testing Library
@@ -302,29 +302,58 @@ markdown passes through untouched. `tsc -b`, `npm run lint`, `prettier --check` 
 imperative browser resources (`MediaRecorder`, `HTMLAudioElement`, object URLs) — the
 interesting part is where that state lives in React.
 
-- [ ] `src/hooks/useAudioRecorder.ts`
-  - [ ] MIME type probing, in order: `audio/webm;codecs=opus`, `audio/webm`,
+- [x] `src/hooks/useAudioRecorder.ts`
+  - [x] MIME type probing, in order: `audio/webm;codecs=opus`, `audio/webm`,
         `audio/mp4` (Safari only accepts this), `audio/ogg;codecs=opus`
-  - [ ] `isSupported`, `permission` (`prompt | checking | granted | denied`), `error`
-  - [ ] `syncPermission()` via the Permissions API, tolerating browsers without it
-  - [ ] `start()`, `stop(): Promise<Blob | null>`, `cancel()`
-  - [ ] **Always release the stream** (`getTracks().forEach(t => t.stop())`) or the
+  - [x] `isSupported`, `permission` (`prompt | checking | granted | denied`), `error`
+  - [x] `syncPermission()` via the Permissions API, tolerating browsers without it
+  - [x] `start()`, `stop(): Promise<Blob | null>`, `cancel()`
+  - [x] **Always release the stream** (`getTracks().forEach(t => t.stop())`) or the
         browser's recording indicator stays lit
-- [ ] `src/hooks/useSpeechPlayer.ts`
-  - [ ] `stripMarkdown()` — port verbatim; TTS will happily pronounce `##` and `**`
-  - [ ] Request-ID guard against out-of-order responses: a newer `speak()` must win
-  - [ ] `URL.revokeObjectURL` on every exit path
-  - [ ] Normal end, error and explicit stop must all land in the same clean state,
+- [x] `src/hooks/useSpeechPlayer.ts`
+  - [x] `stripMarkdown()` — ~~port verbatim~~ *reimplemented; the Svelte tree is not
+        on this machine, same as `format.ts` in Phase 3*
+  - [x] Request-ID guard against out-of-order responses: a newer `speak()` must win
+  - [x] `URL.revokeObjectURL` on every exit path
+  - [x] Normal end, error and explicit stop must all land in the same clean state,
         or the UI sticks on "speaking" forever
-  - [ ] Distinguish autoplay-policy rejection (`NotAllowedError`) from other failures
-- [ ] Wire into the composer: mic button (record → `/api/transcribe` → send as a normal
+  - [x] Distinguish autoplay-policy rejection (`NotAllowedError`) from other failures
+- [x] Wire into the composer: mic button (record → `/api/transcribe` → send as a normal
       turn), speaker toggle (a persisted **mode**, not a per-message action —
       `aria-pressed`, remembered in `chatVoiceOutput`)
-- [ ] Speaking must not start on failed or stopped turns
-- [ ] Starting a recording stops any playback — don't let the bot talk into the open mic
+- [x] Speaking must not start on failed or stopped turns
+- [x] Starting a recording stops any playback — don't let the bot talk into the open mic
+- [x] `src/lib/speechClient.ts` — `transcribeAudio` / `fetchSpeech`, alongside
+      `chatClient.ts`. Not in the original phase list; the two hooks were both about
+      to hand-roll the same two `fetch` calls.
 
 **Done when:** recording a spoken question transcribes and answers it, and toggling the
 speaker reads subsequent replies aloud.
+
+**Verified 2026-08-01** in the browser against `npm run dev` — against a throwaway mock
+on `:8000` again, not the real backend, and with a **synthetic microphone**:
+`getUserMedia` was replaced with a real `MediaStream` carrying an oscillator tone, so the
+browser's own `MediaRecorder` did the encoding and only the capture device was fake. What
+that leaves untested is real speech through the real Whisper and TTS models; everything
+between the mic and the transcript is real code.
+
+Exercised: a 2s recording produced a 209 kB `audio/webm` upload named `audio.webm`, whose
+transcript came back and was sent as an ordinary turn that streamed a reply. The speaker
+toggle persists to `chatVoiceOutput` and reads the *next* reply — the text sent to
+`/api/speak` was the reply with `##`, `**`, the bullet markers and the link target
+stripped and the link text kept, which is `stripMarkdown` doing its job. A stopped turn
+keeps its partial reply, shows `Stopped`, and is **not** spoken. With the speaker off
+nothing is synthesised at all, and turning it back on does not read the reply already on
+screen. Switching it off mid-playback pauses and revokes; switching it off *mid-synthesis*
+discards the clip on arrival — nothing plays, no object URL is ever created, and the
+button does not stick on its spinner. Starting a recording cut playback and revoked the
+URL. `Clear conversation` during a recording cancelled it and released the track. Track
+accounting across the whole session: every track handed to the app was stopped. A failing
+`/api/transcribe` surfaced as a composer error with the mic released and the button back;
+Escape discarded a recording and sent nothing; a `NotAllowedError` from `getUserMedia`
+disabled the mic with an explanatory title. Dark mode checked. Console clean apart from
+the one deliberate failure. `tsc -b`, `npm run lint`, `prettier --check` and
+`npm run build` all clean.
 
 ---
 
@@ -665,4 +694,7 @@ happen.
 | 2026-07-31 | 5 | **`rehype-raw` is an XSS decision, not just a rendering one**, and the plan's locked-decisions table does not say so. Turning it on switches off react-markdown's blanket refusal to render HTML, and reply text is model output from an agent whose toolset includes `scrape_website` — a page the model reads can try to talk it into emitting markup. `Markdown.tsx` replaces the protection rather than dropping it: an element allowlist (no `script`/`iframe`/`style`/`form`/`img`), a small local rehype plugin that deletes every `on*` attribute and cuts script-like subtrees out whole, and react-markdown's built-in `urlTransform` for `javascript:` hrefs. Verified by injecting all four vectors at once. **This is not a full sanitiser** — it is an allowlist I wrote, not an audited one. `rehype-sanitize` is the real answer (one dep, ~10 kB, drops in as another rehype plugin) and is worth taking before this goes anywhere near production. Flagged rather than added, since deps are your call. |
 | 2026-07-31 | 5 | Smaller calls. (1) **The customer's own turns are not rendered as markdown** — their line breaks are meaningful and their asterisks are not emphasis. Only assistant content goes through `Markdown`. (2) `Markdown` is **memoised on the source string**, because during streaming it re-parses on every delta and without it each chunk re-parses every earlier reply in the transcript too. (3) All six heading levels render as `h4` — a chat bubble has no document outline, and the plan specifies `h4` semibold. (4) An assistant message with **empty content renders no bubble at all** (a tool-only turn), so Phase 7's widget will stand alone rather than under an empty box. (5) `stripHtml` parses with `DOMParser` rather than regex-stripping, so `&amp;` reaches the clipboard as `&`; it deliberately leaves markdown alone, since markdown is readable as-is and the plan only asked for HTML. |
 | 2026-07-31 | — | Noticed while reading `FRONTEND_INTEGRATION.md` for the intent enums, and **not acted on**: the deployed backend can require an `X-API-Key` header on every `/api` route when `API_KEYS` is set, and `src/lib/api.ts` sends no such header. Local dev is unaffected (`API_KEYS` unset), so nothing is broken today — but a production build against Cloud Run would get a blanket `401`. Belongs with Phase 10's "production build check against the deployed backend URL". The doc is candid that a `PUBLIC_`-prefixed key is readable in devtools and is drive-by-traffic filtering, not authentication. |
+| 2026-08-01 | 6 | Voice done. Architecture call worth recording: **both voice hooks are composed inside `useChat`, not inside `Composer`.** The phase reads as a composer feature, but three of its own requirements pull the other way — a completed turn has to start playback (only the streaming loop knows a turn completed cleanly), `reset` has to stop the recorder *and* playback, and starting a recording has to stop playback. Owning them in the composer would mean passing callbacks up into the hook and back down again. So `useChat` exposes one `voice` object (`VoiceApi`) and `Composer` is presentational for all of it; `ChatBox` just forwards the prop, and a host that omits it gets a text-only composer with no dead buttons. |
+| 2026-08-01 | 6 | Judgement calls in the voice hooks. (1) **Speaking is keyed off the turn ending in the `try` block**, not off a message flag — a stopped or failed turn leaves through `catch`, so it is structurally impossible for either to be read aloud, rather than depending on a check someone could later remove. (2) **The speaker toggle does not speak the reply already on screen.** It is a mode ("read replies to me from now on"), matching how it is persisted; speaking the last reply on toggle would also fire on a page the customer had scrolled away from. (3) `stripMarkdown` drops link *targets* and keeps link text, and drops fenced code entirely — a read-aloud URL is unusable and a JSON payload read aloud is worse than silence. (4) The recorder's `stop()` resolves from the `MediaRecorder`'s own `stop` event rather than after a timeout, so the last chunk is always in the blob. (5) A denied microphone stays disabled for the rest of the session: `permission` is re-synced on mount only. Granting it in browser settings needs a reload in practice anyway, and polling the Permissions API for a state that rarely changes is not worth it. |
+| 2026-08-01 | 6 | Two things to know for later phases. (1) **`stripMarkdown` is a regex pass, not a parser**, so pathological markdown can leak a stray marker into the spoken text. That is a cosmetic failure in audio, not a security one — unlike `Markdown.tsx`, nothing here renders. (2) The `useSpeechPlayer` request-ID guard has a subtlety Phase 9 should test directly: a *superseded* clip's own `ended`/`error` handlers are guarded too, and the stale-response paths tear down only their own audio element rather than calling the shared `release()`. Without that, a late response from an abandoned request cleans up the clip that replaced it — the bug this shape exists to prevent. |
 | 2026-07-29 | 0 | Prettier is scoped deliberately: `*.md`, `src/index.css` and `src/components/ui` are in `.prettierignore`. The plan and CLAUDE.md are prose, the ported CSS should stay diffable against the Svelte original, and the shadcn components should stay as the CLI emits them. Also noted: the `--font-sans` stack asks for Inter but nothing loads it — it falls back to system-ui, exactly as in the Svelte app, so parity holds and no font dependency was added. |

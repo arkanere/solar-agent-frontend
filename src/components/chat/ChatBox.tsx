@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Composer } from '@/components/chat/Composer';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { stripHtml } from '@/lib/format';
+import type { VoiceApi } from '@/hooks/useChat';
 import { useChatStore } from '@/store/chatStore';
 
 /** Openers for a cold conversation. Hidden the moment the customer says anything. */
@@ -34,6 +35,8 @@ export interface ChatBoxProps {
   onReset?: () => void;
   /** Supplied by the popup host in Phase 8; absent on the full-page chat. */
   onClose?: () => void;
+  /** Microphone and spoken replies. Omitted, the composer stays text-only. */
+  voice?: VoiceApi;
 }
 
 function TypingIndicator() {
@@ -57,6 +60,7 @@ export function ChatBox({
   onRegenerate,
   onReset,
   onClose,
+  voice,
 }: ChatBoxProps) {
   const messages = useChatStore((s) => s.messages);
   const isLoading = useChatStore((s) => s.isLoading);
@@ -193,7 +197,7 @@ export function ChatBox({
         )}
       </div>
 
-      <Composer onSend={onSend} onStop={onStop} isBusy={isLoading} />
+      <Composer onSend={onSend} onStop={onStop} isBusy={isLoading} voice={voice} />
 
       <footer className="flex justify-center border-t border-border px-4 py-2">
         <Button
